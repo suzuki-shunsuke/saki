@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -21,7 +22,7 @@ import (
 )
 
 // agentNamePattern is the rule of herdr's agent names, with the name saki gives.
-var agentNamePattern = regexp.MustCompile(`^(?:task|review)-[0-9]{8}-[0-9]{6}-[a-z2-7]{4}$`)
+var agentNamePattern = regexp.MustCompile(`^(?:task|review|session)-[0-9]{8}-[0-9]{6}-[a-z2-7]{4}$`)
 
 // The prompts are spelled out rather than taken from the package, so that the test pins
 // the text the specification gives.
@@ -510,5 +511,153 @@ func TestLaunchContinuesAfterDisconnect(t *testing.T) {
 	// The browser is gone, so the result has to be in the log.
 	if !strings.Contains(logs.String(), "result=started") {
 		t.Errorf("the result isn't logged: %s", logs.String())
+	}
+}
+
+// startTasksDir has the task "one", whose session is the one it was created in.
+func startTasksDir(t *testing.T) string {
+	t.Helper()
+	dir := emptyTasksDir(t)
+	writeTask(t, dir, "one", "name: one\nclaude_sessions:\n  - id: s1\n")
+	writeTask(t, dir, "two", "name: two\n")
+	return dir
+}
+
+func postStart(t *testing.T, h http.Handler, task string) focusResult {
+	t.Helper()
+	body, err := json.Marshal(map[string]string{"task": task})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := postFocusPath(t, h, "/start", string(body), "application/json", "http://127.0.0.1:8080")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	got := focusResult{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	return got
+}
+
+func TestStart(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		task string
+	}{
+		// The session the task was created in has a pane, but a new session is started
+		// anyway.
+		{name: "task with a session", task: "one"},
+		{name: "task without a session", task: "two"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dir := startTasksDir(t)
+			f := &fakeHerdr{
+				agents:    []herdr.Agent{{PaneID: "w1:p5", Kind: "claude", SessionID: "s1"}},
+				startErrs: []error{busy()},
+			}
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, f, nil, newLauncher(f))
+			got := postStart(t, h, tt.task)
+			want := focusResult{Result: "started", Message: "Started a new Claude Code session for " + tt.task + " in a new tab"}
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("response (-want +got):\n%s", diff)
+			}
+			wantCalls := []string{
+				"pane get w1:p1",
+				"tab create w1 /repo/saki task " + tt.task,
+				"agent start w1:p9", "agent start w1:p9",
+				"agent prompt",
+			}
+			if diff := cmp.Diff(wantCalls, f.calls); diff != "" {
+				t.Errorf("calls (-want +got):\n%s", diff)
+			}
+			taskDir := filepath.ToSlash(filepath.Join(dir, tt.task))
+			wantPrompt := `Run "saki skill show dev-flow" and follow the instructions. This pane is dedicated to this task. Don't open another pane. ` +
+				"Work on the task in " + taskDir + " in this new session. " +
+				"Add this session's ID (the environment variable CLAUDE_CODE_SESSION_ID) to claude_sessions in " + taskDir + "/task.yaml."
+			if f.prompted != wantPrompt {
+				t.Errorf("prompt = %q, want %q", f.prompted, wantPrompt)
+			}
+			if !agentNamePattern.MatchString(f.agent) || !strings.HasPrefix(f.agent, "session-") {
+				t.Errorf("agent name = %q, want session-...", f.agent)
+			}
+			if len(f.focused) != 0 {
+				t.Errorf("focused %v instead of starting a new session", f.focused)
+			}
+		})
+	}
+}
+
+func TestStartNotStarted(t *testing.T) {
+	t.Parallel()
+	notRunning := &herdr.Error{Code: herdr.CodeServerNotRunning, Message: "not running"}
+	tests := []struct {
+		name   string
+		task   string
+		paneID string
+		herdr  *fakeHerdr
+		want   focusResult
+	}{
+		{name: "unknown task", task: "three", herdr: &fakeHerdr{}, want: focusResult{Result: "unknown_task", Message: "three isn't found"}},
+		{name: "path", task: "../one", herdr: &fakeHerdr{}, want: focusResult{Result: "unknown_task", Message: "../one isn't found"}},
+		{name: "outside herdr", task: "one", paneID: "-", herdr: &fakeHerdr{}, want: focusResult{Result: "outside_herdr", Message: "saki serve isn't running in a herdr pane"}},
+		{name: "herdr not running", task: "one", herdr: &fakeHerdr{workspaceErr: notRunning}, want: focusResult{Result: "unavailable", Message: "herdr isn't running"}},
+		{
+			name:  "blocked",
+			task:  "one",
+			herdr: &fakeHerdr{promptErr: &herdr.Error{Code: herdr.CodeAgentBlocked, Message: "blocked"}},
+			want:  focusResult{Result: "blocked", Message: "Claude Code is waiting for input in the new tab"},
+		},
+		{name: "tab fails", task: "one", herdr: &fakeHerdr{createErr: errors.New("boom")}, want: focusResult{Result: "error", Message: "Failed to start Claude Code: boom"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			l := newLauncher(tt.herdr)
+			if tt.paneID == "-" {
+				l.PaneID = ""
+			}
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), startTasksDir(t), nil, tt.herdr, nil, l)
+			got := postStart(t, h, tt.task)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("response (-want +got):\n%s", diff)
+			}
+			if tt.want.Result == "unknown_task" && len(tt.herdr.calls) != 0 {
+				t.Errorf("called herdr %v for an unknown task", tt.herdr.calls)
+			}
+		})
+	}
+}
+
+func TestStartRejected(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		body        string
+		contentType string
+		origin      string
+		want        int
+	}{
+		{name: "another origin", body: `{"task":"one"}`, contentType: "application/json", origin: "http://evil.example.com", want: http.StatusForbidden},
+		{name: "form", body: "task=one", contentType: "application/x-www-form-urlencoded", want: http.StatusForbidden},
+		{name: "invalid JSON", body: `{`, contentType: "application/json", want: http.StatusBadRequest},
+		{name: "no task", body: `{}`, contentType: "application/json", want: http.StatusBadRequest},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := &fakeHerdr{}
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), startTasksDir(t), nil, f, nil, newLauncher(f))
+			rec := postFocusPath(t, h, "/start", tt.body, tt.contentType, tt.origin)
+			if rec.Code != tt.want {
+				t.Errorf("status = %d, want %d", rec.Code, tt.want)
+			}
+			if len(f.calls) != 0 {
+				t.Errorf("called herdr %v on a rejected request", f.calls)
+			}
+		})
 	}
 }

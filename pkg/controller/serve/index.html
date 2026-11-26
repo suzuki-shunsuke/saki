@@ -58,7 +58,7 @@ tbody tr {
   max-width: 100%;
   font: inherit;
 }
-.mo-button {
+.mo-button, .start-button {
   float: right;
   margin-left: 8px;
   font-size: 0.8em;
@@ -110,7 +110,7 @@ tbody tr {
 <tr>{{range .Columns}}<th data-col="{{.Key}}">{{.Key}}</th>{{end}}</tr>
 </thead>
 <tbody>
-{{range .Rows}}<tr data-dir="{{.Dir}}" data-name="{{.Name}}" data-description="{{.Description}}" data-status="{{.Status}}" data-tags="{{.Tags}}" data-repos="{{.Repos}}" data-issues="{{.Issues}}" data-prs="{{.PRs}}">{{range .Cells}}<td data-col="{{.Key}}">{{if eq .Key "name"}}<button type="button" class="mo-button" title="Open the documents in mo">mo</button>{{end}}{{range .Items}}<div>{{if .URL}}<a href="{{.URL}}" title="{{.URL}}" target="_blank" rel="noopener noreferrer">{{.Text}}</a>{{else}}{{.Text}}{{end}}</div>{{end}}</td>{{end}}</tr>
+{{range .Rows}}<tr data-dir="{{.Dir}}" data-name="{{.Name}}" data-description="{{.Description}}" data-status="{{.Status}}" data-tags="{{.Tags}}" data-repos="{{.Repos}}" data-issues="{{.Issues}}" data-prs="{{.PRs}}">{{range .Cells}}<td data-col="{{.Key}}">{{if eq .Key "name"}}<button type="button" class="mo-button" title="Open the documents in mo">mo</button><button type="button" class="start-button" title="Start a new Claude Code session for this task in a new herdr tab">start</button>{{end}}{{range .Items}}<div>{{if .URL}}<a href="{{.URL}}" title="{{.URL}}" target="_blank" rel="noopener noreferrer">{{.Text}}</a>{{else}}{{.Text}}{{end}}</div>{{end}}</td>{{end}}</tr>
 {{end}}</tbody>
 </table>
 <p id="no-match" hidden>No tasks match.</p>
@@ -533,6 +533,32 @@ const postJSON = (path, body) => fetch(path, {
       w.close();
     }
     showToast(body.message, false);
+  });
+})();
+
+(() => {
+  // Clicking a start button starts a new Claude Code session for the task in a new herdr
+  // tab, rather than focusing a session it already has, such as the session it was created
+  // in. The button can't be clicked again until the result comes back, so that a double
+  // click doesn't open two tabs.
+  document.querySelector("tbody").addEventListener("click", async (e) => {
+    const button = e.target.closest(".start-button");
+    if (!button || button.disabled) {
+      return;
+    }
+    const tr = button.closest("tr");
+    button.disabled = true;
+    button.textContent = "Starting...";
+    try {
+      const res = await postJSON("/start", { task: tr.dataset.dir ?? "" });
+      const result = await readResult(res, "started", "Failed to request: ");
+      showToast(result.text, result.succeeded);
+    } catch (err) {
+      showToast(`Failed to request: ${err}`, false);
+    } finally {
+      button.disabled = false;
+      button.textContent = "start";
+    }
   });
 })();
 

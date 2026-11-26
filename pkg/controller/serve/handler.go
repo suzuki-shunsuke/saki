@@ -173,7 +173,8 @@ func claudeSessions(t *task.Task) []item {
 // reload. initialFailures are the failures of the read at startup, which NewHandler warns
 // about so that the first request doesn't repeat the warnings. h focuses the herdr pane of
 // a task's session when its row is clicked, m opens a task's documents in mo when its mo
-// button is clicked, and l starts Claude Code in a new tab to create a task.
+// button is clicked, and l starts Claude Code in a new tab to create a task, or to start a new
+// session for a task when its start button is clicked.
 func NewHandler(logger *slog.Logger, tasksDir string, initialFailures []*task.Failure, h Herdr, m Mo, l *Launcher) http.Handler {
 	reporter := newFailureReporter(logger, initialFailures)
 	mux := http.NewServeMux()
@@ -196,6 +197,9 @@ func NewHandler(logger *slog.Logger, tasksDir string, initialFailures []*task.Fa
 	})
 	mux.HandleFunc("POST /launch", func(w http.ResponseWriter, r *http.Request) {
 		serveLaunch(w, r, logger, l)
+	})
+	mux.HandleFunc("POST /start", func(w http.ResponseWriter, r *http.Request) {
+		serveStart(w, r, logger, l, tasksDir)
 	})
 	return checkHost(mux)
 }
