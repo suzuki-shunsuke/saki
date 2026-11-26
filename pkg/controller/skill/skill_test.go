@@ -18,6 +18,7 @@ func testFS() fstest.MapFS {
 		"barbaz/SKILL.md":       {Data: []byte("---\nname: barbaz\nsummary: Do bar and baz\n---\nbarbaz body\n")},
 		"broken/templates/x.md": {Data: []byte("x\n")},
 		"broken/SKILL.md":       {Data: []byte("no front matter\n")},
+		"crlf/SKILL.md":         {Data: []byte("---\r\nname: crlf\r\nsummary: Do crlf\r\n---\r\n\r\nbody\r\n")},
 		"unterminated/SKILL.md": {Data: []byte("---\nname: u\n")},
 	}
 }
@@ -28,6 +29,7 @@ func TestController_List(t *testing.T) {
 	delete(fsys, "broken/SKILL.md")
 	delete(fsys, "broken/templates/x.md")
 	delete(fsys, "unterminated/SKILL.md")
+	delete(fsys, "crlf/SKILL.md")
 	buf := &bytes.Buffer{}
 	if err := skill.New(fsys).List(buf); err != nil {
 		t.Fatal(err)
@@ -56,9 +58,10 @@ func TestController_Show(t *testing.T) {
 	}{
 		{name: "body without front matter", skill: "foo", want: "## Foo\n\nbody\n"},
 		{name: "body right after the front matter", skill: "barbaz", want: "barbaz body\n"},
+		{name: "CRLF", skill: "crlf", want: "body\n"},
 		{name: "file", skill: "foo", path: "templates/a.md", want: "template a\n"},
 		{name: "nested file", skill: "foo", path: "scripts/b.py", want: "print(1)\n"},
-		{name: "unknown skill", skill: "qux", wantErr: `the skill "qux" isn't found. Available skills: barbaz, broken, foo, unterminated`},
+		{name: "unknown skill", skill: "qux", wantErr: `the skill "qux" isn't found. Available skills: barbaz, broken, crlf, foo, unterminated`},
 		{name: "unknown file", skill: "foo", path: "nope.md", wantErr: `the file "nope.md" isn't found in the skill foo. Available files: scripts/b.py, templates/a.md`},
 		{name: "SKILL.md as a path", skill: "foo", path: "SKILL.md", wantErr: `the file "SKILL.md" isn't found`},
 		{name: "path escaping the skill", skill: "foo", path: "../barbaz/SKILL.md", wantErr: `the file "../barbaz/SKILL.md" isn't found`},

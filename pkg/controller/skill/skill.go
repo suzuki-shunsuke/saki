@@ -141,8 +141,10 @@ func (c *Controller) files(name string) ([]string, error) {
 
 var errNoFrontMatter = errors.New("the front matter isn't found")
 
-// split splits SKILL.md into its front matter and its body.
+// split splits SKILL.md into its front matter and its body. CRLF line endings are
+// read as LF, so that a SKILL.md checked out with CRLF on Windows is parsed too.
 func split(b []byte) (*frontMatter, []byte, error) {
+	b = bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n"))
 	const sep = "---\n"
 	if !bytes.HasPrefix(b, []byte(sep)) {
 		return nil, nil, errNoFrontMatter
