@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>saki tasks</title>
+<style>
+body {
+  font-family: system-ui, sans-serif;
+  margin: 16px;
+}
+#columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-bottom: 16px;
+}
+table {
+  border-collapse: collapse;
+}
+th, td {
+  border: 1px solid #ccc;
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #f4f4f4;
+  position: sticky;
+  top: 0;
+}
+#search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+#search {
+  width: 32em;
+  max-width: 100%;
+}
+#pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+tbody tr {
+  cursor: pointer;
+}
+#launch {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+#launch-text {
+  width: 40em;
+  max-width: 100%;
+  font: inherit;
+}
+.mo-button {
+  float: right;
+  margin-left: 8px;
+  font-size: 0.8em;
+}
+#toast {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  max-width: 32em;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: #333;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.hidden, .filtered-out, .paged-out {
+  display: none;
+}
+</style>
+</head>
+<body>
+<h1>Tasks</h1>
+<form id="launch">
+<textarea id="launch-text" rows="4" placeholder="Describe a task to create with dev-flow, or paste a pull request URL to review" aria-label="Describe a task to create with dev-flow, or paste a pull request URL to review"></textarea>
+<button type="submit" id="launch-button" disabled>Create task</button>
+</form>
+<div id="search-box">
+<input type="search" id="search" placeholder="Filter by name or description, or by status:, tag:, repo:, issue:, pr:" aria-label="Filter by name or description, or by status:, tag:, repo:, issue:, pr:" autocomplete="off">
+<span id="search-count" aria-live="polite"></span>
+<span id="pager">
+<button type="button" id="page-prev">Prev</button>
+<span id="page-info"></span>
+<button type="button" id="page-next">Next</button>
+<label>Per page <select id="page-size">
+<option value="10">10</option>
+<option value="30">30</option>
+<option value="50">50</option>
+<option value="100">100</option>
+<option value="all">All</option>
+</select></label>
+</span>
+</div>
+<fieldset id="columns">
+<legend>Columns</legend>
+{{range .Columns}}<label><input type="checkbox" data-col="{{.Key}}" checked> {{.Key}}</label>
+{{end}}</fieldset>
+<table>
+<thead>
+<tr>{{range .Columns}}<th data-col="{{.Key}}">{{.Key}}</th>{{end}}</tr>
+</thead>
+<tbody>
+{{range .Rows}}<tr data-dir="{{.Dir}}" data-name="{{.Name}}" data-description="{{.Description}}" data-status="{{.Status}}" data-tags="{{.Tags}}" data-repos="{{.Repos}}" data-issues="{{.Issues}}" data-prs="{{.PRs}}">{{range .Cells}}<td data-col="{{.Key}}">{{if eq .Key "name"}}<button type="button" class="mo-button" title="Open the documents in mo">mo</button>{{end}}{{range .Items}}<div>{{if .URL}}<a href="{{.URL}}" title="{{.URL}}" target="_blank" rel="noopener noreferrer">{{.Text}}</a>{{else}}{{.Text}}{{end}}</div>{{end}}</td>{{end}}</tr>
+{{end}}</tbody>
+</table>
+<p id="no-match" hidden>No tasks match.</p>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<script>
+(() => {
+  // The hidden columns are saved rather than the shown ones, so that a column added
+  // later is shown by default.
+  const storageKey = "saki.tasks.hiddenColumns";
+
+  const loadHidden = () => {
+    try {
+      const v = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      return Array.isArray(v) ? new Set(v) : new Set();
+    } catch {
+      // localStorage may be unavailable (e.g. blocked by the browser).
+      return new Set();
+    }
+  };
+
+  const saveHidden = (hidden) => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify([...hidden]));
+    } catch {
+      // Selecting columns still works without saving them.
+    }
+  };
+
+  const apply = (key, shown) => {
+    for (const el of document.querySelectorAll(`th[data-col="${key}"], td[data-col="${key}"]`)) {
+      el.classList.toggle("hidden", !shown);
+    }
+  };
+
+  const hidden = loadHidden();
+  for (const box of document.querySelectorAll("#columns input[data-col]")) {
+    const key = box.dataset.col;
+    box.checked = !hidden.has(key);
+    apply(key, box.checked);
+    box.addEventListener("change", () => {
+      apply(key, box.checked);
+      if (box.checked) {
+        hidden.delete(key);
+      } else {
+        hidden.add(key);
+      }
+      saveHidden(hidden);
+    });
+  }
+})();
+
+(() => {
+  // The search box filters the rows by name and description as it's typed.
+  const input = document.getElementById("search");
+  const count = document.getElementById("search-count");
+  const noMatch = document.getElementById("no-match");
+  const rows = [...document.querySelectorAll("tbody tr")];
+
+  // terms splits the query by white space (including full-width spaces) into lowercase
+  // terms. An empty or blank query has no terms.
+  const terms = (query) => query.trim().toLowerCase().split(/\s+/u).filter((t) => t !== "");
+
+  // fieldKeys are the keys of "<key>:<values>", each with the data attribute of the row
+  // holding the values it matches.
+  const fieldKeys = ["status", "tag", "repo", "issue", "pr"];
+
+  // githubRefPattern matches the URL of a GitHub pull request or issue, optionally followed
+  // by a path, a query, or a fragment (.../pull/1/files, .../pull/1#issuecomment-2).
+  const githubRefPattern = /^https:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/(?:pull|issues)\/([0-9]+)(?:[/?#].*)?$/u;
+
+  // githubRef returns <owner>/<repo>#<number> of a lowercase term that is the URL of a GitHub
+  // pull request or issue, and null for any other term. A pull request and an issue share
+  // the numbers of a repository, so pull and issues aren't told apart.
+  const githubRef = (t) => {
+    const m = githubRefPattern.exec(t);
+    return m ? `${m[1]}/${m[2]}#${m[3]}` : null;
+  };
+
+  // parseQuery splits the lowercase terms into field conditions and the other words.
+  // "<key>:a,b" keeps tasks whose field has a or b, and "-<key>:a,b" keeps tasks whose field
+  // has neither. Only the first character is taken as "-", so hyphens in values (in-review)
+  // are part of them, and everything after the first ":" is the value, so URLs work
+  // (pr:https://...). Empty values are dropped, and a condition without values is ignored so
+  // that the list doesn't go empty while "tag:" is being typed. Each word keeps the
+  // <owner>/<repo>#<number> of a pull request or issue URL as ref (null otherwise).
+  const parseQuery = (ts) => {
+    const q = { conditions: [], words: [] };
+    for (const t of ts) {
+      const exclude = t.startsWith("-");
+      const body = exclude ? t.slice(1) : t;
+      const i = body.indexOf(":");
+      const key = i < 0 ? "" : body.slice(0, i);
+      if (!fieldKeys.includes(key)) {
+        q.words.push({ text: t, ref: githubRef(t) });
+        continue;
+      }
+      const values = body.slice(i + 1).split(",").filter((v) => v !== "");
+      if (values.length > 0) {
+        q.conditions.push({ key, exclude, values });
+      }
+    }
+    return q;
+  };
+
+  // matches reports whether a task meets every condition of the query: each word is in the
+  // name or the description (or, for a pull request or issue URL, the same pull request or
+  // issue is in the task's pull_requests or issues), each field condition has a value in the task's field, and no
+  // field exclusion has one. Everything is compared ignoring case. With no conditions,
+  // every task matches. fields maps each key to the task's values of the field (lowercase).
+  const matches = (q, name, description, fields) => {
+    const n = name.toLowerCase();
+    const d = description.toLowerCase();
+    return q.words.every((w) => n.includes(w.text) || d.includes(w.text) ||
+        (w.ref !== null && (fields.pr.has(w.ref) || fields.issue.has(w.ref)))) &&
+      q.conditions.every((c) => c.values.some((v) => fields[c.key].has(v)) !== c.exclude);
+  };
+
+  // rowFields returns the values each key matches for a row. status is one value (none if
+  // empty) and isn't split, so that it's compared as before; the others are
+  // newline-separated lists.
+  const rowFields = (tr) => {
+    const list = (s) => new Set((s ?? "").toLowerCase().split("\n").filter((v) => v !== ""));
+    return {
+      status: new Set(tr.dataset.status ? [tr.dataset.status.toLowerCase()] : []),
+      tag: list(tr.dataset.tags),
+      repo: list(tr.dataset.repos),
+      issue: list(tr.dataset.issues),
+      pr: list(tr.dataset.prs),
+    };
+  };
+
+  // pageSizes are the choices of the page size. "all" puts every task on one page.
+  const pageSizes = ["10", "30", "50", "100", "all"];
+  const defaultPageSize = "30";
+  const pageSizeKey = "saki.tasks.pageSize";
+
+  // parsePageSize returns the page size of a choice, falling back to the default for an
+  // unknown or missing one.
+  const parsePageSize = (v) => {
+    const choice = pageSizes.includes(v) ? v : defaultPageSize;
+    return choice === "all" ? Infinity : Number(choice);
+  };
+
+  // parsePage returns the page in the URL: a positive integer, or 1 otherwise.
+  const parsePage = (v) => (/^[0-9]+$/.test(v ?? "") && Number(v) >= 1 ? Number(v) : 1);
+
+  // pageRange clamps the page into the pages of the matched tasks and returns the range of
+  // the page: start and end are 1-based and inclusive, and 0 when nothing matches.
+  const pageRange = (matched, page, size) => {
+    const pages = Math.max(1, Math.ceil(matched / size));
+    const p = Math.min(Math.max(1, page), pages);
+    // The first page starts at 1 explicitly, because (1 - 1) * Infinity is NaN for "all".
+    const start = matched === 0 ? 0 : p === 1 ? 1 : (p - 1) * size + 1;
+    const end = Math.min(matched, p * size);
+    return { page: p, pages, start, end };
+  };
+
+  // countText shows the range of the page among the matched tasks, and how many tasks
+  // there are in total when the query filters.
+  const countText = (range, matched, total, filtering) => {
+    const from = filtering ? ` (filtered from ${total})` : "";
+    if (matched === 0) {
+      return `0 tasks${from}`;
+    }
+    return `${range.start}-${range.end} of ${matched} tasks${from}`;
+  };
+
+  const prev = document.getElementById("page-prev");
+  const next = document.getElementById("page-next");
+  const pageInfo = document.getElementById("page-info");
+  const pageSizeSelect = document.getElementById("page-size");
+  let page = 1;
+
+  const loadPageSize = () => {
+    try {
+      return localStorage.getItem(pageSizeKey) ?? defaultPageSize;
+    } catch {
+      // localStorage may be unavailable (e.g. blocked by the browser).
+      return defaultPageSize;
+    }
+  };
+
+  const savePageSize = (v) => {
+    try {
+      localStorage.setItem(pageSizeKey, v);
+    } catch {
+      // Choosing the page size still works without saving it.
+    }
+  };
+
+  // render filters the rows by the query, shows the rows of the current page, and updates
+  // the count, the pager, and the URL.
+  const render = () => {
+    const q = parseQuery(terms(input.value));
+    const matchedRows = [];
+    for (const tr of rows) {
+      const ok = matches(q, tr.dataset.name ?? "", tr.dataset.description ?? "", rowFields(tr));
+      tr.classList.toggle("filtered-out", !ok);
+      if (ok) {
+        matchedRows.push(tr);
+      }
+    }
+    const size = parsePageSize(pageSizeSelect.value);
+    const range = pageRange(matchedRows.length, page, size);
+    page = range.page;
+    matchedRows.forEach((tr, i) => {
+      tr.classList.toggle("paged-out", i < range.start - 1 || i >= range.end);
+    });
+    for (const tr of rows) {
+      if (tr.classList.contains("filtered-out")) {
+        tr.classList.remove("paged-out");
+      }
+    }
+    const filtering = q.words.length > 0 || q.conditions.length > 0;
+    count.textContent = countText(range, matchedRows.length, rows.length, filtering);
+    noMatch.hidden = matchedRows.length !== 0;
+    pageInfo.textContent = `Page ${range.page} of ${range.pages}`;
+    prev.disabled = range.page <= 1;
+    next.disabled = range.page >= range.pages;
+    updateURL();
+  };
+
+  // updateURL keeps the query and the page in the URL without adding a history entry, so
+  // that a reload keeps them. q is removed only when the box is empty, and page on the
+  // first page.
+  const updateURL = () => {
+    const url = new URL(location.href);
+    if (input.value === "") {
+      url.searchParams.delete("q");
+    } else {
+      url.searchParams.set("q", input.value);
+    }
+    if (page === 1) {
+      url.searchParams.delete("page");
+    } else {
+      url.searchParams.set("page", String(page));
+    }
+    history.replaceState(null, "", url);
+  };
+
+  // A new query or page size starts from the first page.
+  const restart = () => {
+    page = 1;
+    render();
+  };
+
+  // onQuery starts from the first page only when the query changed, so that an input
+  // method event which leaves the text as it was (e.g. a canceled composition) keeps the
+  // page.
+  let lastQuery = "";
+  const onQuery = () => {
+    if (input.value === lastQuery) {
+      return;
+    }
+    lastQuery = input.value;
+    restart();
+  };
+
+  prev.addEventListener("click", () => {
+    page--;
+    render();
+  });
+  next.addEventListener("click", () => {
+    page++;
+    render();
+  });
+  pageSizeSelect.addEventListener("change", () => {
+    savePageSize(pageSizeSelect.value);
+    restart();
+  });
+
+  // Filtering waits while an input method is composing text and runs when it's committed.
+  let composing = false;
+  input.addEventListener("compositionstart", () => {
+    composing = true;
+  });
+  input.addEventListener("compositionend", () => {
+    composing = false;
+    onQuery();
+  });
+  input.addEventListener("input", () => {
+    if (composing) {
+      return;
+    }
+    onQuery();
+  });
+
+  const params = new URLSearchParams(location.search);
+  input.value = params.get("q") ?? "";
+  lastQuery = input.value;
+  const stored = loadPageSize();
+  pageSizeSelect.value = pageSizes.includes(stored) ? stored : defaultPageSize;
+  page = parsePage(params.get("page"));
+  render();
+})();
+
+// The results of requests (focusing a pane, starting Claude Code) pop up for a few seconds,
+// longer unless it succeeded, and each request shows it again so that the result of every
+// request can be told apart.
+const toast = document.getElementById("toast");
+const shortToastDuration = 3000;
+const longToastDuration = 6000;
+let toastTimer = null;
+const showToast = (text, succeeded) => {
+  clearTimeout(toastTimer);
+  toast.textContent = text;
+  toast.hidden = false;
+  toastTimer = setTimeout(() => {
+    toast.hidden = true;
+  }, succeeded ? shortToastDuration : longToastDuration);
+};
+
+// readResult returns the message for the server's response, its result, and whether the
+// result is success. A response which isn't a 200 with a JSON message is a failed request.
+const readResult = async (res, success, failurePrefix) => {
+  if (res.ok) {
+    try {
+      const body = await res.json();
+      if (typeof body.message === "string") {
+        return { text: body.message, result: body.result, succeeded: body.result === success };
+      }
+    } catch {
+      // Not JSON: fall through to the HTTP status.
+    }
+  }
+  return { text: `${failurePrefix}HTTP ${res.status}`, result: "", succeeded: false };
+};
+
+const postJSON = (path, body) => fetch(path, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+});
+
+(() => {
+  // Clicking a row asks the server to focus the herdr pane of the task's Claude Code session.
+  // A click on a link only opens the link, a click on a button does what the button does,
+  // and selecting text doesn't ask.
+  document.querySelector("tbody").addEventListener("click", async (e) => {
+    if (e.target.closest("a, button")) {
+      return;
+    }
+    if (String(window.getSelection()) !== "") {
+      return;
+    }
+    const tr = e.target.closest("tr");
+    if (!tr) {
+      return;
+    }
+    try {
+      const res = await postJSON("/focus", { task: tr.dataset.dir ?? "" });
+      const result = await readResult(res, "focused", "Failed to request the focus: ");
+      showToast(result.text, result.succeeded);
+    } catch (err) {
+      showToast(`Failed to request the focus: ${err}`, false);
+    }
+  });
+
+  // Clicking a mo button opens the task's documents in mo, in the one tab this page keeps
+  // for mo: the tab is found by its name, so every task replaces the page in the same tab.
+  // The tab is taken before the request, while the click still allows opening a window, and
+  // shows mo's page once the server has opened the documents. A tab opened for a failed
+  // request is closed; an existing tab is left as it is.
+  const moWindowName = "saki-mo";
+
+  // isBlankWindow reports whether the window is a blank tab window.open has just opened.
+  // A blank tab has this page's origin, while reading the location of mo's page throws.
+  const isBlankWindow = (w) => {
+    try {
+      return w.location.href === "about:blank";
+    } catch {
+      return false;
+    }
+  };
+
+  // moResult returns the server's response, or a failure for a response which isn't one.
+  const moResult = async (res) => {
+    if (res.ok) {
+      try {
+        const body = await res.json();
+        if (typeof body.message === "string") {
+          return body;
+        }
+      } catch {
+        // Not JSON: fall through to the HTTP status.
+      }
+    }
+    return { result: "", message: `Failed to request opening in mo: HTTP ${res.status}` };
+  };
+
+  document.querySelector("tbody").addEventListener("click", async (e) => {
+    const button = e.target.closest(".mo-button");
+    if (!button) {
+      return;
+    }
+    const tr = button.closest("tr");
+    const w = window.open("", moWindowName);
+    const blank = w !== null && isBlankWindow(w);
+    let body;
+    try {
+      const res = await fetch("/mo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: tr.dataset.dir ?? "" }),
+      });
+      body = await moResult(res);
+    } catch (err) {
+      body = { result: "", message: `Failed to request opening in mo: ${err}` };
+    }
+    if (body.result === "opened" && typeof body.url === "string") {
+      if (w === null) {
+        showToast(`The browser blocked the tab for mo. Open ${body.url}`, false);
+        return;
+      }
+      w.location.href = body.url;
+      return;
+    }
+    // Check again: a click on another task may have shown mo's page in the tab meanwhile.
+    if (blank && isBlankWindow(w)) {
+      w.close();
+    }
+    showToast(body.message, false);
+  });
+})();
+
+(() => {
+  // The task description is sent with the button, or Ctrl+Enter / Cmd+Enter, to start
+  // Claude Code in a new herdr tab. Enter alone is a newline, and a key pressed while an
+  // input method is composing text doesn't send. When the text is only the URL of a pull
+  // request, the button says "Review PR" and Claude Code reviews it with pr-review instead.
+  const form = document.getElementById("launch");
+  const text = document.getElementById("launch-text");
+  const button = document.getElementById("launch-button");
+  // The same check as the server's: the owner and the repository are limited to the
+  // characters GitHub allows, the URL is case sensitive, and the spaces are the server's:
+  // \s (Unicode spaces and U+FEFF) and U+0085, which Go counts too.
+  const pullRequestURLPattern = /^https:\/\/github\.com\/[A-Za-z0-9-]+\/([A-Za-z0-9._-]+)\/pull\/[0-9]+(?:[/?#][^\s\u0085]*)?$/u;
+  const trimSpaces = (v) => v.replace(/^[\s\u0085]+|[\s\u0085]+$/gu, "");
+  // kind tells what sending the text does now. The button's label and the request both
+  // come from it, so that what happens is what the button says.
+  const kind = () => {
+    const m = pullRequestURLPattern.exec(trimSpaces(text.value));
+    return m !== null && m[1] !== "." && m[1] !== ".." ? "review" : "task";
+  };
+  let sending = false;
+  const update = () => {
+    button.disabled = sending || text.value.trim() === "";
+    // While sending, the button keeps saying "Starting...".
+    if (!sending) {
+      button.textContent = kind() === "review" ? "Review PR" : "Create task";
+    }
+  };
+  const send = async () => {
+    if (sending || text.value.trim() === "") {
+      return;
+    }
+    // What is sent is decided now; the text may be changed while starting.
+    const sentKind = kind();
+    sending = true;
+    button.textContent = "Starting...";
+    update();
+    // Clear only what was sent: the next description may be typed while starting.
+    const sent = text.value;
+    try {
+      const res = await postJSON("/launch", { text: sent, kind: sentKind });
+      const result = await readResult(res, "started", "Failed to request: ");
+      showToast(result.text, result.succeeded);
+      // A tab already reviewing the pull request was focused: what was asked is done too,
+      // but the popup stays as long as a failure's, as no review was started.
+      const done = result.succeeded || result.result === "focused_existing";
+      if (done && text.value === sent) {
+        text.value = "";
+      }
+    } catch (err) {
+      showToast(`Failed to request: ${err}`, false);
+    } finally {
+      sending = false;
+      update();
+    }
+  };
+  text.addEventListener("input", update);
+  text.addEventListener("keydown", (e) => {
+    // Safari reports the key committing a composition with isComposing false and
+    // keyCode 229.
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.isComposing && e.keyCode !== 229) {
+      e.preventDefault();
+      send();
+    }
+  });
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    send();
+  });
+  // The browser may restore the text when the page is reloaded.
+  update();
+})();
+</script>
+</body>
+</html>
