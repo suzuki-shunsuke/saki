@@ -64,7 +64,7 @@ tasks/
     pr-explanation.md
 ```
 
-- The agent proposes `<task id>` and the human confirms it. If it changes after the documents are created, rename the directory and move its mo watch (see "Opening Documents in mo")
+- The agent proposes `<task id>` and the human confirms it. If it changes after the documents are created and you rename the task directory, move its mo watch too (see "Opening Documents in mo")
 - Open the documents in mo as soon as the task directory is created (see "Opening Documents in mo")
 - Create documents per task. If you decide to split a task during design, split the documents too. Scope / Out of Scope is the criterion for whether to accept review comments, so if it is not split per task, judgments become inconsistent
   - When creating multiple pull requests, create documents per pull request as sub tasks, and make each pull request's scope clear. Reduce rework by settling the pull requests needed for the whole parent task and each pull request's specification before creating any pull request
@@ -137,7 +137,7 @@ When to run it:
 
 Don't run it otherwise: resuming a task in another status doesn't reopen it, and mo picks up new and changed files by itself.
 
-If the human changes the task id after the directory is created, rename the directory, stop watching the old one, and watch the new one. mo drops the moved files from the old group but keeps the watch, and since the old directory no longer exists, pass a quoted glob rather than the directory to `--unwatch`:
+If the task directory is renamed after it is watched (e.g. because the human changed the task id), stop watching the old directory and watch the new one. mo drops the moved files from the old group but keeps the watch, and since the old directory no longer exists, pass a quoted glob rather than the directory to `--unwatch`:
 
 ```sh
 mo --unwatch --target <old task id> 'tasks/<old task id>/*.md'
