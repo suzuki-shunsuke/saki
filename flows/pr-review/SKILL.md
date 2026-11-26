@@ -50,7 +50,7 @@ mo -w --no-ignore --target <owner>/<repo>/<pr number> reviews/<owner>/<repo>/<pr
 ```
 
 - The group is named `<owner>/<repo>/<pr number>`, and its page is `http://localhost:6275/<owner>/<repo>/<pr number>`
-- `--no-ignore` keeps the files even in repositories that ignore `reviews/` in git
+- `--no-ignore` keeps the documents even if git ignore rules match the files in the review directory
 - Don't pass `--no-open`. mo opens the group in the browser when the group is new (or when it starts the mo server), and doesn't when the group already exists
 - Run it in the directory containing `reviews/`. If you have moved to the git worktree of the pull request's head (from step 1), go back there or pass the absolute path
 - If mo isn't installed or fails, don't stop the flow: tell the human the error and go on

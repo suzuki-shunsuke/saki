@@ -124,7 +124,7 @@ mo -w --no-ignore --target <task id> tasks/<task id>/
 ```
 
 - The group is named after the task id, the same group `saki serve`'s `mo` button opens. Each task, including each sub task, gets its own group
-- `--no-ignore` keeps the files even in repositories that ignore `tasks/` in git
+- `--no-ignore` keeps the documents even if git ignore rules match the files in the task directory
 - Don't pass `--no-open`. mo opens the group in the browser when the group is new (or when it starts the mo server), and doesn't when the group already exists
 - Run it in the directory containing `tasks/`, which may not be the repository you're changing. If you have moved to a git worktree (e.g. in step 3), go back there or pass the absolute path
 - If mo isn't installed or fails, don't stop the flow: tell the human the error and go on
@@ -148,7 +148,7 @@ mo -w --no-ignore --target <new task id> tasks/<new task id>/
 
 ### 1. Settle the Direction (Human Approves)
 
-1. Generate task.yaml and the documents from the templates, and open them in mo (see "Opening Documents in mo"). Skip if they already exist
+1. Generate task.yaml and the documents from the templates (skip this if they already exist), and open them in mo (see "Opening Documents in mo"). A draft created from Follow-ups already has its documents: open it here if its `status` is still `backlog` or `todo`
 1. Write Background / What / Why / Scope / Out of Scope
     - This stage confirms that the problem being solved and the direction are right before thinking about details
     - See "Writing the Overview" for how to write it
