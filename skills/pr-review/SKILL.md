@@ -5,6 +5,3 @@ description: When asked to review a pull request created by someone else, genera
 
 Run `saki skill show pr-review` and follow the instructions it prints.
 When they refer to a file of the skill, such as `templates/review.md`, read it with `saki skill show pr-review <path>`.
-
-The instructions are embedded in saki, so they always match the installed saki.
-If saki isn't installed, install it first: https://github.com/suzuki-shunsuke/saki

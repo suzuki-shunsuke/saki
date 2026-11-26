@@ -5,6 +5,3 @@ description: Defines how to go from design through implementation, pull request 
 
 Run `saki skill show dev-flow` and follow the instructions it prints.
 When they refer to a file of the skill, such as `templates/design.md`, read it with `saki skill show dev-flow <path>`.
-
-The instructions are embedded in saki, so they always match the installed saki.
-If saki isn't installed, install it first: https://github.com/suzuki-shunsuke/saki

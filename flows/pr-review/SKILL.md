@@ -14,7 +14,7 @@ description: When asked to review a pull request created by someone else, genera
 
 Start this flow when a human asks you to review or understand a pull request, even if the skill is not explicitly invoked.
 
-Pull requests created and managed with dev-flow (pull requests with a corresponding task in tasks/) are out of scope. For those, follow the dev-flow flow.
+Pull requests created and managed with dev-flow (pull requests with a corresponding task in tasks/) are out of scope. For those, follow the dev-flow flow (`saki skill show dev-flow`).
 
 1. Look for documents corresponding to the request in `reviews/<owner>/<repo>/<pr number>/`
 1. If there are none, start from step 1 of Steps
