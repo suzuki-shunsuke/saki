@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -66,6 +67,9 @@ const (
 	reviewPromptPrefix = `Run "saki skill show pr-review" and follow the instructions. ` + dedicatedPane + " Review "
 	// reviewTabPrefix starts the label of a review's tab, followed by <owner>/<repo>#<number>.
 	reviewTabPrefix = "review "
+	// sessionTabPrefix starts the label of the tab of a task's new session, followed by the
+	// task's directory name.
+	sessionTabPrefix = "task "
 )
 
 // Launcher starts Claude Code in a new herdr tab to create a task from a description, or
@@ -162,6 +166,22 @@ func reviewJob(text string) (*launchJob, *focusResponse) {
 		prompt:      reviewPromptPrefix + "https://github.com/" + owner + "/" + repo + "/pull/" + number,
 		started:     "Started Claude Code to review the PR in a new tab",
 	}, nil
+}
+
+// sessionJob returns the job to start a new Claude Code session for the task in the
+// directory dir of tasksDir, so that the task is worked on in its own session rather than
+// in the session it was created in. The session adds its own ID to claude_sessions, so
+// that clicking the task's row focuses it afterwards.
+func sessionJob(tasksDir, dir string) *launchJob {
+	taskDir := filepath.ToSlash(filepath.Join(tasksDir, dir))
+	return &launchJob{
+		tabLabel:    sessionTabPrefix + dir,
+		agentPrefix: "session",
+		prompt: `Run "saki skill show dev-flow" and follow the instructions. ` + dedicatedPane +
+			" Work on the task in " + taskDir + " in this new session." +
+			" Append this session's ID (the environment variable CLAUDE_CODE_SESSION_ID) to the end of claude_sessions in " + taskDir + "/task.yaml.",
+		started: "Started a new Claude Code session for " + dir + " in a new tab",
+	}
 }
 
 // newLaunchJob returns the job of the request's kind, or a response when its text is
@@ -306,7 +326,7 @@ func (l *Launcher) failure(logger *slog.Logger, err error) *focusResponse {
 
 // agentName returns a name herdr accepts ([a-z][a-z0-9_-]{0,31}), unique enough even for
 // two launches in the same second. rand.Text is base32 (A-Z, 2-7), lowercased for herdr.
-// "review-" makes the longest name, 27 characters.
+// "session-" makes the longest name, 28 characters.
 func (l *Launcher) agentName(prefix string) string {
 	return prefix + "-" + l.now().Format("20060102-150405") + "-" + strings.ToLower(rand.Text()[:4])
 }
@@ -362,6 +382,26 @@ func serveLaunch(w http.ResponseWriter, r *http.Request, logger *slog.Logger, l 
 		logger.Info("focus the herdr tab already reviewing the pull request", "result", res.Result, "message", res.Message)
 	default:
 		logger.Info("start Claude Code in a new herdr tab", "result", res.Result, "message", res.Message)
+	}
+	writeJSON(w, logger, http.StatusOK, res)
+}
+
+// serveStart handles POST /start, which starts a new Claude Code session for a task in a
+// new herdr tab.
+func serveStart(w http.ResponseWriter, r *http.Request, logger *slog.Logger, l *Launcher, tasksDir string) {
+	dir, ok := readTaskRequest(w, r, logger)
+	if !ok {
+		return
+	}
+	var res *focusResponse
+	if t := findTask(tasksDir, dir); t == nil {
+		res = &focusResponse{Result: focusUnknownTask, Message: dir + " isn't found"}
+	} else {
+		// As with serveLaunch, starting goes on even if the browser goes away.
+		res = l.launch(context.WithoutCancel(r.Context()), logger, sessionJob(tasksDir, t.Dir))
+	}
+	if res.Result != launchError {
+		logger.Info("start a new Claude Code session for the task in a new herdr tab", "task", dir, "result", res.Result, "message", res.Message)
 	}
 	writeJSON(w, logger, http.StatusOK, res)
 }
