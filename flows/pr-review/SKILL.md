@@ -58,7 +58,7 @@ mo -w --no-ignore --target <owner>/<repo>/<pr number> reviews/<owner>/<repo>/<pr
 When to run it:
 
 1. When you create the review directory and write its first document in step 1 (`details.md` or `review.md`, whichever comes first)
-1. When you hand over to the human in step 5, run the same command with `--open`, so that the browser opens the group even when it already exists. This includes returning to step 5 from "When the Pull Request Is Updated"
+1. When you hand over to the human in step 5, run the same command again (it re-registers the watch if it was lost) and give the human the group's URL, `http://localhost:6275/<owner>/<repo>/<pr number>`. If the human closed the group's tab, they reopen it from the URL. This includes returning to step 5 from "When the Pull Request Is Updated". Don't pass `--open`: it opens another tab even when the group's tab is still open, and Chrome stalls new tabs once six tabs keep connections to mo (each mo tab holds one)
 
 Don't run it otherwise: mo picks up new and changed files by itself.
 
@@ -139,7 +139,7 @@ Write improvement ideas outside the pull request's purpose in Follow-ups, not in
 
 ### 5. Hand Over to the Human
 
-1. Open the documents with `mo --open -w --no-ignore --target <owner>/<repo>/<pr number> reviews/<owner>/<repo>/<pr number>/` (see "Opening Documents in mo")
+1. Run `mo -w --no-ignore --target <owner>/<repo>/<pr number> reviews/<owner>/<repo>/<pr number>/` and give the human the group's URL (see "Opening Documents in mo")
 1. The human reads the documents and asks questions in conversation with the agent. The agent answers and reflects the answers in the documents if needed (mo reloads automatically on save)
 1. The human decides which Review Findings to comment on the pull request, and whether to Approve, Request changes, or Comment
 

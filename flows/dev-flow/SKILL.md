@@ -134,7 +134,7 @@ When to run it:
 1. When you create a task's directory and write its first document, whichever step it happens in: step 1 of Steps, splitting a task or creating sub tasks during design, creating tasks from an investigation's Next Tasks, and "When a Pull Request Already Exists"
 1. Except for a draft task created from Follow-ups in step 4: don't run it when you create the draft
 1. When you start an existing task whose `status` is `backlog` or `todo`, such as a draft from Follow-ups: run it as you begin step 1 (of Steps, or of Investigation Tasks). Judge by the status before you update it to `overview-design`
-1. When you hand over to the human in step 4, or in step 3 of Investigation Tasks, run the same command with `--open`, so that the browser opens the group even when it already exists
+1. When you hand over to the human in step 4, or in step 3 of Investigation Tasks, run the same command again (it re-registers the watch if it was lost) and give the human the group's URL, `http://localhost:6275/<task id>`. If the human closed the group's tab, they reopen it from the URL or `saki serve`'s `mo` button. Don't pass `--open`: it opens another tab even when the group's tab is still open, and Chrome stalls new tabs once six tabs keep connections to mo (each mo tab holds one)
 
 Don't run it otherwise: resuming a task in another status doesn't reopen it, and mo picks up new and changed files by itself.
 
@@ -219,7 +219,7 @@ At this stage, follow these rules.
 
 ### 4. The Human Decides
 
-1. Open the task's documents with `mo --open -w --no-ignore --target <task id> tasks/<task id>/` (see "Opening Documents in mo"). The human reads the final documents, the decision log in details.md, and the PR Explanation, and asks questions in conversation with the agent. The agent answers and, if needed, reflects the answers in the documents and the PR Explanation (mo reloads automatically on save)
+1. Run `mo -w --no-ignore --target <task id> tasks/<task id>/` and give the human the group's URL (see "Opening Documents in mo"). The human reads the final documents, the decision log in details.md, and the PR Explanation, and asks questions in conversation with the agent. The agent answers and, if needed, reflects the answers in the documents and the PR Explanation (mo reloads automatically on save)
 1. The human decides on the pull request
 1. The human decides which Follow-ups become tasks, and the agent creates them
     - A task created from Follow-ups is a draft: generate it from the templates with `status: backlog`, write what is known in Background / What / Why, and note in Background which task's Follow-ups it came from. Its overview is approved from step 1 of Steps when it is started. Don't open it in mo now; it is opened when it is started (`status` `backlog` or `todo`)
@@ -263,7 +263,7 @@ If the approved Questions / Scope cannot produce an answer, or the investigation
 
 ### 3. Decide on the Conclusion (Human Approves)
 
-1. Open the task's documents with `mo --open -w --no-ignore --target <task id> tasks/<task id>/` (see "Opening Documents in mo"), and get the human's approval of Findings / Conclusion / Next Tasks
+1. Run `mo -w --no-ignore --target <task id> tasks/<task id>/`, give the human the group's URL (see "Opening Documents in mo"), and get the human's approval of Findings / Conclusion / Next Tasks
 1. Create a new task for each approved Next Task (`type: implementation`, or `type: investigation` if further investigation is needed)
     - In the new task's Background, write the investigation task's conclusion and a link to the investigation task's document
     - Set both `derived_from` / `derived_tasks` in task.yaml
