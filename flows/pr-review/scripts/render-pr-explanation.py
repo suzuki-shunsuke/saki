@@ -5,7 +5,7 @@ Usage:
     render-pr-explanation.py --spec spec.json --diff pr.diff --out pr-explanation.html
 
 The diff is the output of `git diff <base>...<head>` (or `gh pr diff`). The spec format is
-described in references/pr-explanation-html.md.
+described in `saki skill show pr-review references/pr-explanation-html.md`.
 
 The page has no scripts and loads nothing from the network, so it works when opened
 directly in a browser.
@@ -403,7 +403,7 @@ span.ln { display: inline-block; font-family: var(--font-mono); font-size: 0.7re
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--spec", required=True, help="spec JSON (see references/pr-explanation-html.md)")
+    ap.add_argument("--spec", required=True, help="spec JSON (see: saki skill show pr-review references/pr-explanation-html.md)")
     ap.add_argument("--diff", required=True, help="output of git diff <base>...<head>")
     ap.add_argument("--out", required=True, help="HTML file to write")
     args = ap.parse_args()
