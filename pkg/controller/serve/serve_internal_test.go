@@ -104,3 +104,21 @@ func TestShortGitHubRef(t *testing.T) {
 		}
 	}
 }
+
+func TestSessionJob(t *testing.T) {
+	t.Parallel()
+	// saki serve reads the tasks directory "tasks" relative to the directory Claude Code
+	// runs in, so the prompt names the task by that relative path.
+	got := sessionJob(task.DefaultDir, "one")
+	want := &launchJob{
+		tabLabel:    "task one",
+		agentPrefix: "session",
+		prompt: `Run "saki skill show dev-flow" and follow the instructions. This pane is dedicated to this task. Don't open another pane. ` +
+			"Work on the task in tasks/one in this new session. " +
+			"Add this session's ID (the environment variable CLAUDE_CODE_SESSION_ID) to claude_sessions in tasks/one/task.yaml.",
+		started: "Started a new Claude Code session for one in a new tab",
+	}
+	if diff := cmp.Diff(want, got, cmp.AllowUnexported(launchJob{})); diff != "" {
+		t.Errorf("job (-want +got):\n%s", diff)
+	}
+}
