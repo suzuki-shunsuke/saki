@@ -23,6 +23,13 @@ import (
 // agentNamePattern is the rule of herdr's agent names, with the name saki gives.
 var agentNamePattern = regexp.MustCompile(`^(?:task|review)-[0-9]{8}-[0-9]{6}-[a-z2-7]{4}$`)
 
+// The prompts are spelled out rather than taken from the package, so that the test pins
+// the text the specification gives.
+const (
+	launchPromptPrefix = `Run "saki skill show dev-flow" and follow the instructions. This pane is dedicated to this task. Don't open another pane. Create a task:` + "\n"
+	reviewPromptPrefix = `Run "saki skill show pr-review" and follow the instructions. This pane is dedicated to this task. Don't open another pane. Review `
+)
+
 func busy() error {
 	return &herdr.Error{Code: herdr.CodePaneBusy, Message: "agent target pane w1:p9 is not an available shell"}
 }
@@ -77,7 +84,7 @@ func TestLaunch(t *testing.T) {
 	if diff := cmp.Diff(wantCalls, f.calls); diff != "" {
 		t.Errorf("calls (-want +got):\n%s", diff)
 	}
-	if want := "/dev-flow Create a task\nExport as CSV\nthe second line"; f.prompted != want {
+	if want := launchPromptPrefix + "Export as CSV\nthe second line"; f.prompted != want {
 		t.Errorf("prompt = %q, want %q", f.prompted, want)
 	}
 	if !strings.HasPrefix(f.agent, "task-") {
@@ -93,7 +100,7 @@ func TestLaunchTaskKind(t *testing.T) {
 	if diff := cmp.Diff(focusResult{Result: "started", Message: "Started Claude Code in a new tab"}, got); diff != "" {
 		t.Errorf("response (-want +got):\n%s", diff)
 	}
-	if want := "/dev-flow Create a task\nhttps://github.com/aquaproj/aqua/pull/1"; f.prompted != want {
+	if want := launchPromptPrefix + "https://github.com/aquaproj/aqua/pull/1"; f.prompted != want {
 		t.Errorf("prompt = %q, want %q", f.prompted, want)
 	}
 	if !strings.HasPrefix(f.agent, "task-") {
@@ -119,20 +126,20 @@ func TestLaunchReview(t *testing.T) {
 			name:   "files",
 			text:   "\n  https://github.com/AquaProj/Aqua/pull/1/files \n",
 			label:  "review AquaProj/Aqua#1",
-			prompt: "/pr-review https://github.com/AquaProj/Aqua/pull/1",
+			prompt: reviewPromptPrefix + "https://github.com/AquaProj/Aqua/pull/1",
 		},
-		{name: "fragment", text: "https://github.com/a/b/pull/12#discussion_r1", label: "review a/b#12", prompt: "/pr-review https://github.com/a/b/pull/12"},
-		{name: "query", text: "https://github.com/a/b/pull/12?w=1", label: "review a/b#12", prompt: "/pr-review https://github.com/a/b/pull/12"},
-		{name: "BOM and NEL around", text: "\uFEFF\u0085https://github.com/a/b/pull/12\u0085\uFEFF", label: "review a/b#12", prompt: "/pr-review https://github.com/a/b/pull/12"},
-		{name: "trailing slash", text: "https://github.com/a/b/pull/12/", label: "review a/b#12", prompt: "/pr-review https://github.com/a/b/pull/12"},
-		{name: "dot repository", text: "https://github.com/aquaproj/.github/pull/1", label: "review aquaproj/.github#1", prompt: "/pr-review https://github.com/aquaproj/.github/pull/1"},
-		{name: "repository with dots", text: "https://github.com/a/b.c_d-e/pull/3", label: "review a/b.c_d-e#3", prompt: "/pr-review https://github.com/a/b.c_d-e/pull/3"},
+		{name: "fragment", text: "https://github.com/a/b/pull/12#discussion_r1", label: "review a/b#12", prompt: reviewPromptPrefix + "https://github.com/a/b/pull/12"},
+		{name: "query", text: "https://github.com/a/b/pull/12?w=1", label: "review a/b#12", prompt: reviewPromptPrefix + "https://github.com/a/b/pull/12"},
+		{name: "BOM and NEL around", text: "\uFEFF\u0085https://github.com/a/b/pull/12\u0085\uFEFF", label: "review a/b#12", prompt: reviewPromptPrefix + "https://github.com/a/b/pull/12"},
+		{name: "trailing slash", text: "https://github.com/a/b/pull/12/", label: "review a/b#12", prompt: reviewPromptPrefix + "https://github.com/a/b/pull/12"},
+		{name: "dot repository", text: "https://github.com/aquaproj/.github/pull/1", label: "review aquaproj/.github#1", prompt: reviewPromptPrefix + "https://github.com/aquaproj/.github/pull/1"},
+		{name: "repository with dots", text: "https://github.com/a/b.c_d-e/pull/3", label: "review a/b.c_d-e#3", prompt: reviewPromptPrefix + "https://github.com/a/b.c_d-e/pull/3"},
 		{
 			// A review has no length limit, because what follows the number isn't sent.
 			name:   "long",
 			text:   "https://github.com/a/b/pull/1/" + strings.Repeat("x", 10001),
 			label:  "review a/b#1",
-			prompt: "/pr-review https://github.com/a/b/pull/1",
+			prompt: reviewPromptPrefix + "https://github.com/a/b/pull/1",
 		},
 	}
 	for _, tt := range tests {
