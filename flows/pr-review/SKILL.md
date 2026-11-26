@@ -39,6 +39,29 @@ reviews/
 - `details.md`: the record of primary information and decisions. Write the collected information (commands and the gist of their output, URLs of referenced issues, related pull requests, Slack threads, etc.), the evidence behind guesses, and for each finding of the agent's review whether it was adopted or rejected and why. Keep it separate from review.md because it tends to grow large
 - `pr-explanation.md`: the PR Explanation (see "PR Explanation")
 
+Open the documents in mo as soon as the review directory is created (see "Opening Documents in mo").
+
+## Opening Documents in mo
+
+Open each review's documents in [mo](https://github.com/k1LoW/mo), the Markdown viewer, so that the human can follow them in the browser while the agent writes them. Watch the review directory instead of passing files: every `*.md` directly under it, including ones created later such as `review.md` and `pr-explanation.md`, is added to the group automatically, and mo re-renders a file when it's saved.
+
+```sh
+mo -w --no-ignore --target <owner>/<repo>/<pr number> reviews/<owner>/<repo>/<pr number>/
+```
+
+- The group is named `<owner>/<repo>/<pr number>`, and its page is `http://localhost:6275/<owner>/<repo>/<pr number>`
+- `--no-ignore` keeps the files even in repositories that ignore `reviews/` in git
+- Don't pass `--no-open`. mo opens the group in the browser when the group is new (or when it starts the mo server), and doesn't when the group already exists
+- Run it in the directory containing `reviews/`. If you have moved to the git worktree of the pull request's head (from step 1), go back there or pass the absolute path
+- If mo isn't installed or fails, don't stop the flow: tell the human the error and go on
+
+When to run it:
+
+1. When you create the review directory and write its first document in step 1 (`details.md` or `review.md`, whichever comes first)
+1. When you hand over to the human in step 5, run the same command with `--open`, so that the browser opens the group even when it already exists. This includes returning to step 5 from "When the Pull Request Is Updated"
+
+Don't run it otherwise: mo picks up new and changed files by itself.
+
 ## Steps
 
 ### 1. Collect Information
@@ -52,7 +75,7 @@ reviews/
 1. The diff alone does not show callers or surrounding context, so check out the pull request's head with git worktree and read the code
 1. Base everything written from here on on the head SHA at this point. Record it as Reviewed Head in review.md
 
-Record the collected information and its sources in details.md.
+Record the collected information and its sources in details.md. When you first create the review directory, open it in mo (see "Opening Documents in mo").
 
 ### 2. Write the Overview and Specification
 
@@ -116,7 +139,7 @@ Write improvement ideas outside the pull request's purpose in Follow-ups, not in
 
 ### 5. Hand Over to the Human
 
-1. Open the documents with `mo` (`mo reviews/<owner>/<repo>/<pr number>/review.md reviews/<owner>/<repo>/<pr number>/pr-explanation.md`)
+1. Open the documents with `mo --open -w --no-ignore --target <owner>/<repo>/<pr number> reviews/<owner>/<repo>/<pr number>/` (see "Opening Documents in mo")
 1. The human reads the documents and asks questions in conversation with the agent. The agent answers and reflects the answers in the documents if needed (mo reloads automatically on save)
 1. The human decides which Review Findings to comment on the pull request, and whether to Approve, Request changes, or Comment
 
