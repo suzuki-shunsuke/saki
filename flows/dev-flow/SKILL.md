@@ -132,7 +132,7 @@ mo -w --no-ignore --target <task id> tasks/<task id>/
 When to run it:
 
 1. When you create a task's directory and write its first document, whichever step it happens in: step 1 of Steps, splitting a task or creating sub tasks during design, creating tasks from an investigation's Next Tasks, and "When a Pull Request Already Exists"
-1. Except for a draft task created from Follow-ups in step 4: don't run it when you create the draft. Run it when the draft is started, that is, when you begin step 1 of Steps while its `status` is still `backlog` or `todo`
+1. Except for a draft task created from Follow-ups in step 4: don't run it when you create the draft. Run it when the draft is started, that is, when you begin step 1 of Steps on a draft whose `status` was `backlog` or `todo` before you updated it to `overview-design`
 1. When you hand over to the human in step 4, run the same command with `--open`, so that the browser opens the group even when it already exists
 
 Don't run it otherwise: resuming a task in another status doesn't reopen it, and mo picks up new and changed files by itself.
@@ -148,7 +148,7 @@ mo -w --no-ignore --target <new task id> tasks/<new task id>/
 
 ### 1. Settle the Direction (Human Approves)
 
-1. Generate task.yaml and the documents from the templates (skip this if they already exist), and open them in mo (see "Opening Documents in mo"). A draft created from Follow-ups already has its documents: open it here if its `status` is still `backlog` or `todo`
+1. Generate task.yaml and the documents from the templates (skip this if they already exist), and open them in mo (see "Opening Documents in mo"). A draft created from Follow-ups already has its documents: open it here if its `status` was `backlog` or `todo` before you entered step 1 (judge by the status before updating it to `overview-design`)
 1. Write Background / What / Why / Scope / Out of Scope
     - This stage confirms that the problem being solved and the direction are right before thinking about details
     - See "Writing the Overview" for how to write it
