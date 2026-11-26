@@ -10,6 +10,7 @@ import (
 	"github.com/suzuki-shunsuke/cobra-util/cobrautil"
 	"github.com/suzuki-shunsuke/saki/pkg/cli/flag"
 	"github.com/suzuki-shunsuke/saki/pkg/cli/serve"
+	"github.com/suzuki-shunsuke/saki/pkg/cli/skill"
 	"github.com/suzuki-shunsuke/slog-util/slogutil"
 )
 
@@ -44,6 +45,7 @@ See https://github.com/suzuki-shunsuke/saki for details.`,
 	gFlags.Set(cmd.PersistentFlags())
 	cmd.AddCommand(
 		serve.New(logger, gFlags, acts.serve),
+		skill.New(),
 	)
 	return cobrautil.Command(env, cmd, nil)
 }

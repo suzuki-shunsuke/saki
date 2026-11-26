@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/suzuki-shunsuke/cobra-util/cobrautil"
 	"github.com/suzuki-shunsuke/saki/pkg/cli/flag"
+	"github.com/suzuki-shunsuke/saki/pkg/cli/skill"
 	"github.com/suzuki-shunsuke/saki/pkg/controller/serve"
 	"github.com/suzuki-shunsuke/saki/pkg/task"
 	"github.com/suzuki-shunsuke/slog-util/slogutil"
@@ -46,6 +47,12 @@ It serves a page listing the tasks on 127.0.0.1. Every time the page is opened, 
 task.yaml of every directory under the tasks directory of the current directory, so changes
 to task.yaml show up on reload.
 It stops on SIGINT (Ctrl-C) or SIGTERM.
+
+The form at the top of the page starts Claude Code in a new herdr tab. Claude Code is
+told to run "saki skill show dev-flow" (or pr-review) and follow it, so saki needs to be
+in PATH there. saki serve needs to run in a herdr pane.
+
+` + skill.PermissionHelp + `
 
 $ saki serve
 $ saki serve --port 3000`,

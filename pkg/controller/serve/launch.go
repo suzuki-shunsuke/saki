@@ -55,9 +55,15 @@ const (
 	defaultLaunchRetryInterval = 500 * time.Millisecond
 	// launchTabLabel is the label of the new tab.
 	launchTabLabel = "new task"
+	// dedicatedPane tells Claude Code that the new pane is the task's own, so that the flow,
+	// which otherwise opens a pane for each task, doesn't open another one.
+	dedicatedPane = "This pane is dedicated to this task. Don't open another pane."
 	// launchPromptPrefix is put before the description, so that Claude Code creates a task
-	// with the dev-flow skill.
-	launchPromptPrefix = "/dev-flow Create a task\n"
+	// with the dev-flow flow embedded in saki. No skill needs to be installed.
+	launchPromptPrefix = `Run "saki skill show dev-flow" and follow the instructions. ` + dedicatedPane + " Create a task:\n"
+	// reviewPromptPrefix is put before the URL of a pull request, so that Claude Code
+	// reviews it with the pr-review flow embedded in saki.
+	reviewPromptPrefix = `Run "saki skill show pr-review" and follow the instructions. ` + dedicatedPane + " Review "
 	// reviewTabPrefix starts the label of a review's tab, followed by <owner>/<repo>#<number>.
 	reviewTabPrefix = "review "
 )
@@ -153,7 +159,7 @@ func reviewJob(text string) (*launchJob, *focusResponse) {
 		tabLabel:    reviewTabPrefix + owner + "/" + repo + "#" + number,
 		reuseTab:    true,
 		agentPrefix: "review",
-		prompt:      "/pr-review https://github.com/" + owner + "/" + repo + "/pull/" + number,
+		prompt:      reviewPromptPrefix + "https://github.com/" + owner + "/" + repo + "/pull/" + number,
 		started:     "Started Claude Code to review the PR in a new tab",
 	}, nil
 }

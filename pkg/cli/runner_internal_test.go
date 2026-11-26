@@ -200,3 +200,42 @@ func TestNewCommand_help(t *testing.T) {
 		})
 	}
 }
+
+func TestNewCommand_skill(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		args    []string
+		want    string
+		wantErr bool
+	}{
+		{name: "list", args: []string{"skill", "list"}, want: "dev-flow   Design"},
+		{name: "show", args: []string{"skill", "show", "dev-flow"}, want: "## Principles"},
+		{name: "show a file", args: []string{"skill", "show", "pr-review", "templates/review.md"}, want: "## Background"},
+		{name: "show without a name", args: []string{"skill", "show"}, wantErr: true},
+		{name: "show with too many arguments", args: []string{"skill", "show", "dev-flow", "a", "b"}, wantErr: true},
+		{name: "unknown skill", args: []string{"skill", "show", "foo"}, wantErr: true},
+		{name: "list with an argument", args: []string{"skill", "list", "foo"}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, out, err := execute(t, tt.args, nil)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("an error should be returned")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(out, tt.want) {
+				t.Fatalf("the output should contain %q: %q", tt.want, out)
+			}
+			if diff := cmp.Diff(&received{}, got); diff != "" {
+				t.Fatalf("no other action should run (-want, +got)\n%s", diff)
+			}
+		})
+	}
+}
