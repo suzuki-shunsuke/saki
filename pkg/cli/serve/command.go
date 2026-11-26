@@ -1,0 +1,77 @@
+// Package serve implements the 'saki serve' command.
+// It wires the flags into the serve controller.
+package serve
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/spf13/cobra"
+	"github.com/suzuki-shunsuke/cobra-util/cobrautil"
+	"github.com/suzuki-shunsuke/saki/pkg/cli/flag"
+	"github.com/suzuki-shunsuke/saki/pkg/controller/serve"
+	"github.com/suzuki-shunsuke/saki/pkg/task"
+	"github.com/suzuki-shunsuke/slog-util/slogutil"
+)
+
+// Args holds the flag values of the serve command.
+type Args struct {
+	*flag.GlobalFlags
+
+	Port int
+}
+
+// Action runs the serve command with the parsed flag values.
+type Action func(ctx context.Context, args *Args) error
+
+// New creates the serve command. action replaces what the command does, so that a
+// test can check the parsed flag values without starting the server; nil runs the
+// server.
+func New(logger *slogutil.Logger, gFlags *flag.GlobalFlags, action Action) *cobra.Command {
+	args := &Args{
+		GlobalFlags: gFlags,
+	}
+	if action == nil {
+		action = func(ctx context.Context, args *Args) error {
+			return run(ctx, logger, args)
+		}
+	}
+	cmd := &cobra.Command{
+		Use:   "serve",
+		Short: "Start a web server listing the tasks",
+		Long: `Start a web server listing the tasks.
+
+It serves a page listing the tasks on 127.0.0.1. Every time the page is opened, it reads
+task.yaml of every directory under the tasks directory of the current directory, so changes
+to task.yaml show up on reload.
+It stops on SIGINT (Ctrl-C) or SIGTERM.
+
+$ saki serve
+$ saki serve --port 3000`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return action(cmd.Context(), args)
+		},
+	}
+	fs := cmd.Flags()
+	fs.IntVar(&args.Port, "port", serve.DefaultPort, "port to listen on")
+	cobrautil.Envs(fs, "port", "SAKI_PORT")
+	return cmd
+}
+
+func run(ctx context.Context, logger *slogutil.Logger, args *Args) error {
+	if err := logger.SetLevel(args.LogLevel); err != nil {
+		return fmt.Errorf("set log level: %w", err)
+	}
+	dir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get the current directory: %w", err)
+	}
+	return serve.Serve(ctx, logger.Logger, &serve.Param{ //nolint:wrapcheck
+		TasksDir:    task.DefaultDir,
+		Port:        args.Port,
+		HerdrPaneID: os.Getenv("HERDR_PANE_ID"),
+		Dir:         dir,
+	})
+}

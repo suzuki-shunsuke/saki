@@ -1,0 +1,61 @@
+---
+version: 2
+project_name: saki
+archives:
+  - name_template: "{{.ProjectName}}_{{.Os}}_{{.Arch}}"
+    files:
+      - LICENSE
+      - README.md
+      - third_party_licenses/**/*
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+checksum:
+  name_template: "{{ .ProjectName }}_checksums.txt"
+builds:
+  - binary: saki
+    main: cmd/saki/main.go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+release:
+  prerelease: "true"
+  header: |
+    [Pull Requests](https://github.com/suzuki-shunsuke/saki/pulls?q=is%3Apr+milestone%3A{{.Tag}}) | [Issues](https://github.com/suzuki-shunsuke/saki/issues?q=is%3Aissue+milestone%3A{{.Tag}}) | https://github.com/suzuki-shunsuke/saki/compare/{{.PreviousTag}}...{{.Tag}}
+
+sboms:
+  - id: default
+    disable: false
+
+homebrew_casks:
+  - repository:
+      owner: suzuki-shunsuke
+      name: homebrew-saki
+    # The project name and current git tag are used in the format string.
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: https://github.com/suzuki-shunsuke/saki
+    description: A framework to work with coding agents
+    license: MIT
+    skip_upload: true
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/saki"]
+          end
+
+scoops:
+  -
+    description: |
+      A framework to work with coding agents
+    license: MIT
+    skip_upload: true
+    repository:
+      owner: suzuki-shunsuke
+      name: scoop-bucket
