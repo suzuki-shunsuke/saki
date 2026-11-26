@@ -179,7 +179,7 @@ func sessionJob(tasksDir, dir string) *launchJob {
 		agentPrefix: "session",
 		prompt: `Run "saki skill show dev-flow" and follow the instructions. ` + dedicatedPane +
 			" Work on the task in " + taskDir + " in this new session." +
-			" Add this session's ID (the environment variable CLAUDE_CODE_SESSION_ID) to claude_sessions in " + taskDir + "/task.yaml.",
+			" Append this session's ID (the environment variable CLAUDE_CODE_SESSION_ID) to the end of claude_sessions in " + taskDir + "/task.yaml.",
 		started: "Started a new Claude Code session for " + dir + " in a new tab",
 	}
 }

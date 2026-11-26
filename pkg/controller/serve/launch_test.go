@@ -577,7 +577,7 @@ func TestStart(t *testing.T) {
 			taskDir := filepath.ToSlash(filepath.Join(dir, tt.task))
 			wantPrompt := `Run "saki skill show dev-flow" and follow the instructions. This pane is dedicated to this task. Don't open another pane. ` +
 				"Work on the task in " + taskDir + " in this new session. " +
-				"Add this session's ID (the environment variable CLAUDE_CODE_SESSION_ID) to claude_sessions in " + taskDir + "/task.yaml."
+				"Append this session's ID (the environment variable CLAUDE_CODE_SESSION_ID) to the end of claude_sessions in " + taskDir + "/task.yaml."
 			if f.prompted != wantPrompt {
 				t.Errorf("prompt = %q, want %q", f.prompted, wantPrompt)
 			}

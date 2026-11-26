@@ -115,7 +115,7 @@ func TestSessionJob(t *testing.T) {
 		agentPrefix: "session",
 		prompt: `Run "saki skill show dev-flow" and follow the instructions. This pane is dedicated to this task. Don't open another pane. ` +
 			"Work on the task in tasks/one in this new session. " +
-			"Add this session's ID (the environment variable CLAUDE_CODE_SESSION_ID) to claude_sessions in tasks/one/task.yaml.",
+			"Append this session's ID (the environment variable CLAUDE_CODE_SESSION_ID) to the end of claude_sessions in tasks/one/task.yaml.",
 		started: "Started a new Claude Code session for one in a new tab",
 	}
 	if diff := cmp.Diff(want, got, cmp.AllowUnexported(launchJob{})); diff != "" {
