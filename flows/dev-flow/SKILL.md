@@ -26,7 +26,7 @@ If a human judges it necessary and explicitly invokes the skill, start the flow 
 1. If there is none, generate the task documents from the templates before writing any code, write Background / What / Why / Scope / Out of Scope, and ask the human for a review (start from step 1 of Steps). If the request is too vague to write these, ask what they want implemented
     - If what to do (What) is not yet decided and investigation or organizing information is needed to decide it, start an investigation task (see "Investigation Tasks")
 1. If there is one, determine the progress from task.yaml's `type` and `status`, which sections are filled in, and the decision log in details.md, and resume from the next step
-    - If it is a draft created from Follow-ups and its `status` is still `backlog` or `todo`, open it in mo as you start step 1 (see "Opening Documents in mo")
+    - If its `status` is `backlog` or `todo`, the task is being started: open it in mo as you start step 1 (see "Opening Documents in mo")
 
 Work on each task in its own herdr pane.
 
@@ -132,8 +132,9 @@ mo -w --no-ignore --target <task id> tasks/<task id>/
 When to run it:
 
 1. When you create a task's directory and write its first document, whichever step it happens in: step 1 of Steps, splitting a task or creating sub tasks during design, creating tasks from an investigation's Next Tasks, and "When a Pull Request Already Exists"
-1. Except for a draft task created from Follow-ups in step 4: don't run it when you create the draft. Run it when the draft is started, that is, when you begin step 1 of Steps on a draft whose `status` was `backlog` or `todo` before you updated it to `overview-design`
-1. When you hand over to the human in step 4, run the same command with `--open`, so that the browser opens the group even when it already exists
+1. Except for a draft task created from Follow-ups in step 4: don't run it when you create the draft
+1. When you start an existing task whose `status` is `backlog` or `todo`, such as a draft from Follow-ups: run it as you begin step 1 (of Steps, or of Investigation Tasks). Judge by the status before you update it to `overview-design`
+1. When you hand over to the human in step 4, or in step 3 of Investigation Tasks, run the same command with `--open`, so that the browser opens the group even when it already exists
 
 Don't run it otherwise: resuming a task in another status doesn't reopen it, and mo picks up new and changed files by itself.
 
@@ -148,7 +149,7 @@ mo -w --no-ignore --target <new task id> tasks/<new task id>/
 
 ### 1. Settle the Direction (Human Approves)
 
-1. Generate task.yaml and the documents from the templates (skip this if they already exist), and open them in mo (see "Opening Documents in mo"). A draft created from Follow-ups already has its documents: open it here if its `status` was `backlog` or `todo` before you entered step 1 (judge by the status before updating it to `overview-design`)
+1. Generate task.yaml and the documents from the templates (skip this if they already exist), and open them in mo (see "Opening Documents in mo"). An existing task whose `status` was `backlog` or `todo` before you entered step 1, such as a draft from Follow-ups, already has its documents: open it here too (judge by the status before updating it to `overview-design`)
 1. Write Background / What / Why / Scope / Out of Scope
     - This stage confirms that the problem being solved and the direction are right before thinking about details
     - See "Writing the Overview" for how to write it
@@ -221,7 +222,7 @@ At this stage, follow these rules.
 1. Open the task's documents with `mo --open -w --no-ignore --target <task id> tasks/<task id>/` (see "Opening Documents in mo"). The human reads the final documents, the decision log in details.md, and the PR Explanation, and asks questions in conversation with the agent. The agent answers and, if needed, reflects the answers in the documents and the PR Explanation (mo reloads automatically on save)
 1. The human decides on the pull request
 1. The human decides which Follow-ups become tasks, and the agent creates them
-    - A task created from Follow-ups is a draft: generate it from the templates with `status: backlog`, write what is known in Background / What / Why, and note in Background which task's Follow-ups it came from. Its overview is approved from step 1 of Steps when it is started. Don't open it in mo now; it is opened when it is started
+    - A task created from Follow-ups is a draft: generate it from the templates with `status: backlog`, write what is known in Background / What / Why, and note in Background which task's Follow-ups it came from. Its overview is approved from step 1 of Steps when it is started. Don't open it in mo now; it is opened when it is started (`status` `backlog` or `todo`)
     - In the original task's Follow-ups, write the task id next to each item
 1. The human merges
 
@@ -239,7 +240,7 @@ Separating investigation from implementation lets the human approve the investig
 
 ### 1. Settle the Investigation's Direction (Human Approves)
 
-1. Generate task.yaml and the document from the templates, and open them in mo (see "Opening Documents in mo")
+1. Generate task.yaml and the document from the templates (skip this if they already exist), and open them in mo (see "Opening Documents in mo"). Open an existing task here too if its `status` was `backlog` or `todo`
 1. Write Background / What / Why / Scope / Out of Scope
     - Background: what is already known and the history, as premises for the investigation
     - What: what to investigate and organize
@@ -262,7 +263,7 @@ If the approved Questions / Scope cannot produce an answer, or the investigation
 
 ### 3. Decide on the Conclusion (Human Approves)
 
-1. Get the human's approval of Findings / Conclusion / Next Tasks
+1. Open the task's documents with `mo --open -w --no-ignore --target <task id> tasks/<task id>/` (see "Opening Documents in mo"), and get the human's approval of Findings / Conclusion / Next Tasks
 1. Create a new task for each approved Next Task (`type: implementation`, or `type: investigation` if further investigation is needed)
     - In the new task's Background, write the investigation task's conclusion and a link to the investigation task's document
     - Set both `derived_from` / `derived_tasks` in task.yaml
