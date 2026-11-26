@@ -1,6 +1,6 @@
 module github.com/suzuki-shunsuke/saki
 
-go 1.26.5
+go 1.27.4
 
 require (
 	github.com/goccy/go-yaml v1.19.2
