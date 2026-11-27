@@ -26,6 +26,7 @@ If a human judges it necessary and explicitly invokes the skill, start the flow 
 1. If there is none, generate the task documents from the templates before writing any code, write Background / What / Why / Scope / Out of Scope, and ask the human for a review (start from step 1 of Steps). If the request is too vague to write these, ask what they want implemented
     - If what to do (What) is not yet decided and investigation or organizing information is needed to decide it, start an investigation task (see "Investigation Tasks")
 1. If there is one, determine the progress from task.yaml's `type` and `status`, which sections are filled in, and the decision log in details.md, and resume from the next step
+    - If its `status` is `backlog` or `todo`, the task is being started: open it in mo as you start step 1 (see "Opening Documents in mo")
 
 Work on each task in its own herdr pane.
 
@@ -63,7 +64,8 @@ tasks/
     pr-explanation.md
 ```
 
-- The agent proposes `<task id>` and the human confirms it
+- The agent proposes `<task id>` and the human confirms it. If it changes after the documents are created and you rename the task directory, move its mo watch too (see "Opening Documents in mo")
+- Open the documents in mo as soon as the task directory is created (see "Opening Documents in mo")
 - Create documents per task. If you decide to split a task during design, split the documents too. Scope / Out of Scope is the criterion for whether to accept review comments, so if it is not split per task, judgments become inconsistent
   - When creating multiple pull requests, create documents per pull request as sub tasks, and make each pull request's scope clear. Reduce rework by settling the pull requests needed for the whole parent task and each pull request's specification before creating any pull request
 - `task.yaml`: the task's metadata, generated from `saki skill show dev-flow templates/task.yaml` (see "task.yaml")
@@ -113,11 +115,42 @@ pull_requests:
 - When you create a sub task, set both the parent's `sub_tasks` and the child's `parent_task`
 - When you create a task from an investigation task, set both the investigation task's `derived_tasks` and the new task's `derived_from`. Distinguish these from sub tasks (one task split per pull request)
 
+### Opening Documents in mo
+
+Open each task's documents in [mo](https://github.com/k1LoW/mo), the Markdown viewer, so that the human can read them in the browser while the agent writes them. Watch the task directory instead of passing files: every `*.md` directly under it, including ones created later such as `details.md` and `pr-explanation.md`, is added to the group automatically, and mo re-renders a file when it's saved.
+
+```sh
+mo -w --no-ignore --target <task id> tasks/<task id>/
+```
+
+- The group is named after the task id, the same group `saki serve`'s `mo` button opens. Each task, including each sub task, gets its own group
+- `--no-ignore` keeps the documents even if git ignore rules match the files in the task directory
+- Don't pass `--no-open`, except when you create several tasks at once (see below). mo opens the group in the browser when the group is new (or when it starts the mo server), and doesn't when the group already exists
+- Run it in the directory containing `tasks/`, which may not be the repository you're changing. If you have moved to a git worktree (e.g. in step 3), go back there or pass the absolute path
+- If mo isn't installed or fails, don't stop the flow: tell the human the error and go on
+
+When to run it:
+
+1. When you create a task's directory and write its first document, whichever step it happens in: step 1 of Steps, splitting a task or creating sub tasks during design, creating tasks from an investigation's Next Tasks, and "When a Pull Request Already Exists"
+    - When you create several tasks at once (e.g. sub tasks, a split, or several Next Tasks), add `--no-open` so that a tab doesn't open for each task, and give the human each group's URL, `http://localhost:6275/<task id>`. Chrome stalls new tabs once six tabs keep connections to mo (each mo tab holds one)
+1. Except for a draft task created from Follow-ups in step 4: don't run it when you create the draft
+1. When you start an existing task whose `status` is `backlog` or `todo`, such as a draft from Follow-ups: run it as you begin step 1 (of Steps, or of Investigation Tasks). Judge by the status before you update it to `overview-design`
+1. When you hand over to the human in step 4, or in step 3 of Investigation Tasks, run the same command again (it re-registers the watch if it was lost) and give the human the group's URL, `http://localhost:6275/<task id>`. If the human closed the group's tab, they reopen it from the URL or `saki serve`'s `mo` button. Don't pass `--open`: it opens another tab even when the group's tab is still open, and Chrome stalls new tabs once six tabs keep connections to mo (each mo tab holds one)
+
+Don't run it otherwise: resuming a task in another status doesn't reopen it, and mo picks up new and changed files by itself.
+
+If the task directory is renamed after it is watched (e.g. because the human changed the task id), stop watching the old directory and watch the new one. mo drops the moved files from the old group but keeps the watch, and since the old directory no longer exists, pass a quoted glob rather than the directory to `--unwatch`:
+
+```sh
+mo --unwatch --target <old task id> 'tasks/<old task id>/*.md'
+mo -w --no-ignore --target <new task id> tasks/<new task id>/
+```
+
 ## Steps
 
 ### 1. Settle the Direction (Human Approves)
 
-1. Generate task.yaml and the documents from the templates. Skip if they already exist
+1. Generate task.yaml and the documents from the templates (skip this if they already exist), and open them in mo (see "Opening Documents in mo"). An existing task whose `status` was `backlog` or `todo` before you entered step 1, such as a draft from Follow-ups, already has its documents: open it here too (judge by the status before updating it to `overview-design`)
 1. Write Background / What / Why / Scope / Out of Scope
     - This stage confirms that the problem being solved and the direction are right before thinking about details
     - See "Writing the Overview" for how to write it
@@ -187,10 +220,10 @@ At this stage, follow these rules.
 
 ### 4. The Human Decides
 
-1. Open the final documents and the PR Explanation with `mo` (`mo tasks/<task id>/<task id>.md tasks/<task id>/pr-explanation.md`). The human reads the final documents, the decision log in details.md, and the PR Explanation, and asks questions in conversation with the agent. The agent answers and, if needed, reflects the answers in the documents and the PR Explanation (mo reloads automatically on save)
+1. Run `mo -w --no-ignore --target <task id> tasks/<task id>/` and give the human the group's URL (see "Opening Documents in mo"). The human reads the final documents, the decision log in details.md, and the PR Explanation, and asks questions in conversation with the agent. The agent answers and, if needed, reflects the answers in the documents and the PR Explanation (mo reloads automatically on save)
 1. The human decides on the pull request
 1. The human decides which Follow-ups become tasks, and the agent creates them
-    - A task created from Follow-ups is a draft: generate it from the templates with `status: backlog`, write what is known in Background / What / Why, and note in Background which task's Follow-ups it came from. Its overview is approved from step 1 of Steps when it is started
+    - A task created from Follow-ups is a draft: generate it from the templates with `status: backlog`, write what is known in Background / What / Why, and note in Background which task's Follow-ups it came from. Its overview is approved from step 1 of Steps when it is started. Don't open it in mo now; it is opened when it is started (`status` `backlog` or `todo`)
     - In the original task's Follow-ups, write the task id next to each item
 1. The human merges
 
@@ -208,7 +241,7 @@ Separating investigation from implementation lets the human approve the investig
 
 ### 1. Settle the Investigation's Direction (Human Approves)
 
-1. Generate task.yaml and the document from the templates
+1. Generate task.yaml and the document from the templates (skip this if they already exist), and open them in mo (see "Opening Documents in mo"). Open an existing task here too if its `status` was `backlog` or `todo`
 1. Write Background / What / Why / Scope / Out of Scope
     - Background: what is already known and the history, as premises for the investigation
     - What: what to investigate and organize
@@ -231,7 +264,7 @@ If the approved Questions / Scope cannot produce an answer, or the investigation
 
 ### 3. Decide on the Conclusion (Human Approves)
 
-1. Get the human's approval of Findings / Conclusion / Next Tasks
+1. Run `mo -w --no-ignore --target <task id> tasks/<task id>/`, give the human the group's URL (see "Opening Documents in mo"), and get the human's approval of Findings / Conclusion / Next Tasks
 1. Create a new task for each approved Next Task (`type: implementation`, or `type: investigation` if further investigation is needed)
     - In the new task's Background, write the investigation task's conclusion and a link to the investigation task's document
     - Set both `derived_from` / `derived_tasks` in task.yaml
