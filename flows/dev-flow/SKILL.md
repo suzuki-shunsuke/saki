@@ -125,13 +125,14 @@ mo -w --no-ignore --target <task id> tasks/<task id>/
 
 - The group is named after the task id, the same group `saki serve`'s `mo` button opens. Each task, including each sub task, gets its own group
 - `--no-ignore` keeps the documents even if git ignore rules match the files in the task directory
-- Don't pass `--no-open`. mo opens the group in the browser when the group is new (or when it starts the mo server), and doesn't when the group already exists
+- Don't pass `--no-open`, except when you create several tasks at once (see below). mo opens the group in the browser when the group is new (or when it starts the mo server), and doesn't when the group already exists
 - Run it in the directory containing `tasks/`, which may not be the repository you're changing. If you have moved to a git worktree (e.g. in step 3), go back there or pass the absolute path
 - If mo isn't installed or fails, don't stop the flow: tell the human the error and go on
 
 When to run it:
 
 1. When you create a task's directory and write its first document, whichever step it happens in: step 1 of Steps, splitting a task or creating sub tasks during design, creating tasks from an investigation's Next Tasks, and "When a Pull Request Already Exists"
+    - When you create several tasks at once (e.g. sub tasks, a split, or several Next Tasks), add `--no-open` so that a tab doesn't open for each task, and give the human each group's URL, `http://localhost:6275/<task id>`. Chrome stalls new tabs once six tabs keep connections to mo (each mo tab holds one)
 1. Except for a draft task created from Follow-ups in step 4: don't run it when you create the draft
 1. When you start an existing task whose `status` is `backlog` or `todo`, such as a draft from Follow-ups: run it as you begin step 1 (of Steps, or of Investigation Tasks). Judge by the status before you update it to `overview-design`
 1. When you hand over to the human in step 4, or in step 3 of Investigation Tasks, run the same command again (it re-registers the watch if it was lost) and give the human the group's URL, `http://localhost:6275/<task id>`. If the human closed the group's tab, they reopen it from the URL or `saki serve`'s `mo` button. Don't pass `--open`: it opens another tab even when the group's tab is still open, and Chrome stalls new tabs once six tabs keep connections to mo (each mo tab holds one)
