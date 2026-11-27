@@ -661,3 +661,55 @@ func TestStartRejected(t *testing.T) {
 		})
 	}
 }
+
+// TestStartReview starts a session for a review of pr-review: its tab has the label of the
+// form's review, so a tab already reviewing the pull request is focused instead.
+func TestStartReview(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		tabs []herdr.Tab
+		// focus is the tab focused, or "" when a new tab is created.
+		focus string
+	}{
+		{name: "new tab", tabs: []herdr.Tab{{TabID: "w1:t1", Label: "review aquaproj/aqua#123"}}},
+		{name: "tab of the form", tabs: []herdr.Tab{{TabID: "w1:t1", Label: "review AquaProj/Aqua#1234"}}, focus: "w1:t1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dir := emptyTasksDir(t)
+			writeTask(t, dir, "review_aquaproj_aqua_1234", "name: review_aquaproj_aqua_1234\ntype: pr-review\npull_requests:\n  - https://github.com/aquaproj/aqua/pull/1234\n")
+			f := &fakeHerdr{tabs: tt.tabs, startErrs: []error{busy()}}
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, f, nil, newLauncher(f))
+			got := postStart(t, h, "review_aquaproj_aqua_1234")
+			if tt.focus != "" {
+				want := focusResult{Result: "focused_existing", Message: "A tab is already reviewing AquaProj/Aqua#1234: focused it"}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("response (-want +got):\n%s", diff)
+				}
+				if diff := cmp.Diff([]string{"tab list", "tab focus " + tt.focus}, f.calls); diff != "" {
+					t.Errorf("calls (-want +got):\n%s", diff)
+				}
+				return
+			}
+			want := focusResult{Result: "started", Message: "Started a new Claude Code session for review_aquaproj_aqua_1234 in a new tab"}
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("response (-want +got):\n%s", diff)
+			}
+			wantCalls := []string{
+				"tab list",
+				"pane get w1:p1",
+				"tab create w1 /repo/saki review aquaproj/aqua#1234",
+				"agent start w1:p9", "agent start w1:p9",
+				"agent prompt",
+			}
+			if diff := cmp.Diff(wantCalls, f.calls); diff != "" {
+				t.Errorf("calls (-want +got):\n%s", diff)
+			}
+			if !strings.HasPrefix(f.prompted, `Run "saki skill show pr-review" and follow the instructions.`) {
+				t.Errorf("prompt = %q, want pr-review's", f.prompted)
+			}
+		})
+	}
+}

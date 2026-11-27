@@ -109,7 +109,7 @@ func TestSessionJob(t *testing.T) {
 	t.Parallel()
 	// saki serve reads the tasks directory "tasks" relative to the directory Claude Code
 	// runs in, so the prompt names the task by that relative path.
-	got := sessionJob(task.DefaultDir, "one")
+	got := sessionJob(task.DefaultDir, &task.Task{Dir: "one", Type: "implementation", PullRequests: []string{"https://github.com/o/r/pull/1"}})
 	want := &launchJob{
 		tabLabel:    "task one",
 		agentPrefix: "session",
@@ -120,5 +120,60 @@ func TestSessionJob(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, got, cmp.AllowUnexported(launchJob{})); diff != "" {
 		t.Errorf("job (-want +got):\n%s", diff)
+	}
+}
+
+func TestSessionJobReview(t *testing.T) {
+	t.Parallel()
+	const prefix = `Run "saki skill show pr-review" and follow the instructions. This pane is dedicated to this task. Don't open another pane. `
+	const appendSession = " Append this session's ID (the environment variable CLAUDE_CODE_SESSION_ID) to the end of claude_sessions in tasks/review_o_r_1/task.yaml."
+	tests := []struct {
+		name string
+		prs  []string
+		want *launchJob
+	}{
+		{
+			// The tab has the label of the form's review, and the URL is built from its
+			// parts: what followed the number isn't sent.
+			name: "pull request",
+			prs:  []string{"https://github.com/O/R/pull/1/files#diff"},
+			want: &launchJob{
+				tabLabel:    "review O/R#1",
+				reuseTab:    true,
+				agentPrefix: "session",
+				prompt:      prefix + "Resume the review of https://github.com/O/R/pull/1 in tasks/review_o_r_1 in this new session." + appendSession,
+				started:     "Started a new Claude Code session for review_o_r_1 in a new tab",
+			},
+		},
+		{
+			name: "the first URL of a pull request",
+			prs:  []string{"https://github.com/o/r/issues/2", "https://github.com/o/r/pull/3", "https://github.com/o/r/pull/4"},
+			want: &launchJob{
+				tabLabel:    "review o/r#3",
+				reuseTab:    true,
+				agentPrefix: "session",
+				prompt:      prefix + "Resume the review of https://github.com/o/r/pull/3 in tasks/review_o_r_1 in this new session." + appendSession,
+				started:     "Started a new Claude Code session for review_o_r_1 in a new tab",
+			},
+		},
+		{
+			name: "no pull request",
+			prs:  []string{"https://example.com/o/r/pull/1"},
+			want: &launchJob{
+				tabLabel:    "task review_o_r_1",
+				agentPrefix: "session",
+				prompt:      prefix + "Resume the review in tasks/review_o_r_1 in this new session." + appendSession,
+				started:     "Started a new Claude Code session for review_o_r_1 in a new tab",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := sessionJob(task.DefaultDir, &task.Task{Dir: "review_o_r_1", Type: task.TypePRReview, PullRequests: tt.prs})
+			if diff := cmp.Diff(tt.want, got, cmp.AllowUnexported(launchJob{})); diff != "" {
+				t.Errorf("job (-want +got):\n%s", diff)
+			}
+		})
 	}
 }

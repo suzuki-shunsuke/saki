@@ -1,0 +1,13 @@
+name: # review id: review_<owner>_<repo>_<pr number>, the owner and the repository in lower case
+description: # Review <owner>/<repo>#<pr number>: <pull request title>
+type: pr-review
+status: doing # doing, in-review, pending, cancel, done
+tags: []
+claude_sessions: [] # - id: <session id>, description: <summary of the session and how it relates to the review>
+parent_task: ""
+sub_tasks: []
+derived_from: ""
+derived_tasks: []
+repositories: [] # - https://github.com/<owner>/<repo>
+issues: [] # the URLs of the issues the pull request closes (closingIssuesReferences)
+pull_requests: [] # - https://github.com/<owner>/<repo>/pull/<pr number>
