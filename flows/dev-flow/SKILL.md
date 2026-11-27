@@ -148,7 +148,7 @@ tasks/
 #### When to Update
 
 - Update the Next Action whenever what to do next changes: when you change `status` in task.yaml, when you ask the human for approval or an answer, and when the human approves or answers
-- Change the Next Action at the same time as `status`, so that the two always match the table above (except while waiting for an answer, as described above)
+- Change the Next Action at the same time as `status`, so that the two always match the table above (except while waiting for an answer or doing short work following the human's decision, as described above)
 - Write the short description and the Next Action when you create a task. This applies to every task you create: a sub task, a task created from an investigation task or from Follow-ups, and a task split off during design
 - Leave existing documents without them as they are
 
