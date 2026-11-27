@@ -20,7 +20,7 @@ Pull requests created and managed with dev-flow are out of scope: a pull request
 1. If there is no such directory, start from step 1 of Steps
 1. If the directory has no task.yaml (the review stopped in step 1 before creating it), create task.yaml (see "task.yaml") and continue step 1
 1. Otherwise, append this session's ID to `claude_sessions` (see "task.yaml"), and resume according to `status`
-    - `doing` and Review Findings in review.md are already written (the review stopped during "When the Pull Request Is Updated"): follow "When the Pull Request Is Updated" again from the beginning, with the diff from the Reviewed Head to the pull request's current head
+    - `doing` and details.md records that "When the Pull Request Is Updated" started without recording that it finished (the review stopped during the update): follow "When the Pull Request Is Updated" again from the beginning, with the diff from the Reviewed Head to the pull request's current head
     - `doing` otherwise (the review stopped in steps 1-4): determine the progress from which sections are filled in and the record in details.md, and continue from the next step. If review.md has no Reviewed Head yet, continue step 1. If it has one and the pull request's head is newer, first move to the new head: record the change in details.md, update the documents already written according to the diff (`git diff <reviewed head>..<new head>`), point the worktree and the code links at the new head, and update Reviewed Head. Then continue from the step where the review stopped. Don't use "When the Pull Request Is Updated", which is for reviews that finished step 4 and returns to step 5
     - `in-review` or `done`: compare the Reviewed Head recorded in the documents with the pull request's current head. If the pull request has been updated, follow "When the Pull Request Is Updated"; otherwise resume from step 5 of Steps
     - `pending` or `cancel`: ask the human whether to resume the review
@@ -179,11 +179,11 @@ Write improvement ideas outside the pull request's purpose in Follow-ups, not in
 
 ## When the Pull Request Is Updated
 
-1. Set `status` to `doing`
+1. Set `status` to `doing`, and record in details.md that the update from the Reviewed Head to the new head started, so that a session resuming the review knows it stopped during the update (see "Starting the Flow")
 1. Check the diff from the Reviewed Head to the new head (`git diff <reviewed head>..<new head>` or GitHub's compare)
 1. Update review.md and pr-explanation.md according to the diff. Repoint code links to the new head's SHA
 1. Have an agent review the added diff under the same rules as step 4 of Steps. Also check whether existing Review Findings have been resolved, and update their status
-1. Update Reviewed Head to the new head, and record what changed in details.md
+1. Update Reviewed Head to the new head, and record what changed and that the update finished in details.md
 1. Resume from step 5 of Steps
 
 ## PR Explanation
