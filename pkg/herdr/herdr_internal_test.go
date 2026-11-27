@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 // fakeHerdr writes a script standing in for the herdr command.
@@ -105,7 +107,7 @@ func TestClientLaunchCommands(t *testing.T) {
 "pane get") [ "$3" = w1:p1 ] || exit 9; echo '{"result":{"pane":{"pane_id":"w1:p1","workspace_id":"w3"}}}' ;;
 "tab create") [ "$*" = "tab create --workspace w3 --cwd /repo/saki --label new task --focus" ] || exit 9
   echo '{"result":{"root_pane":{"pane_id":"w3:p7"},"tab":{"tab_id":"w3:t2"},"type":"tab_created"}}' ;;
-"agent start") [ "$*" = "agent start task-x --kind claude --pane w3:p7 --timeout 1500" ] || exit 9 ;;
+"agent start") [ "$*" = "agent start task-x --kind claude --pane w3:p7 --timeout 1500" ] || [ "$*" = "agent start resume-x --kind claude --pane w3:p7 --timeout 1500 -- --resume 0b7c0c8e-1d2f-4a3b-9c4d-5e6f7a8b9c0d" ] || exit 9 ;;
 "agent prompt") [ "$#" = 4 ] && [ "$3" = task-x ] && [ "$4" = "$(printf '/dev-flow x\n$(echo y); z')" ] || exit 9 ;;
 *) exit 9 ;;
 esac`)
@@ -120,6 +122,10 @@ esac`)
 	}
 	if err := c.StartAgent(ctx, "task-x", "w3:p7", 1500*time.Millisecond); err != nil {
 		t.Errorf("StartAgent() = %v", err)
+	}
+	// The arguments of Claude Code follow "--".
+	if err := c.StartAgent(ctx, "resume-x", "w3:p7", 1500*time.Millisecond, "--resume", "0b7c0c8e-1d2f-4a3b-9c4d-5e6f7a8b9c0d"); err != nil {
+		t.Errorf("StartAgent() with arguments = %v", err)
 	}
 	if err := c.Prompt(ctx, "task-x", "/dev-flow x\n$(echo y); z"); err != nil {
 		t.Errorf("Prompt() = %v", err)
@@ -150,5 +156,38 @@ func TestHasCode(t *testing.T) {
 	err := fmt.Errorf("wrapped: %w", &Error{Code: CodePaneBusy, Message: "busy"})
 	if !HasCode(err, CodePaneBusy) || HasCode(err, CodeAgentBlocked) || HasCode(errors.New("x"), CodePaneBusy) {
 		t.Error("HasCode() is wrong")
+	}
+}
+
+func TestClientPaneAgent(t *testing.T) {
+	t.Parallel()
+	c := fakeHerdr(t, `[ "$*" = "pane get $3" ] || exit 9
+case "$3" in
+w1:p1) echo '{"result":{"pane":{"pane_id":"w1:p1","agent":"claude","agent_session":{"agent":"claude","kind":"id","value":"s1"},"agent_status":"idle"}}}' ;;
+w1:p2) echo '{"result":{"pane":{"pane_id":"w1:p2","agent":"claude","agent_session":null,"agent_status":"blocked"}}}' ;;
+w1:p3) echo '{"result":{"pane":{"pane_id":"w1:p3","agent":null,"agent_session":null,"agent_status":"idle"}}}' ;;
+*) echo '{"error":{"code":"pane_not_found","message":"pane not found"}}' >&2; exit 1 ;;
+esac`)
+	tests := []struct {
+		pane string
+		want *Agent
+	}{
+		{pane: "w1:p1", want: &Agent{PaneID: "w1:p1", Kind: "claude", SessionID: "s1"}},
+		// Claude Code waiting at a dialog during startup: no session is recorded yet.
+		{pane: "w1:p2", want: &Agent{PaneID: "w1:p2", Kind: "claude"}},
+		// Claude Code exited and only the shell is left.
+		{pane: "w1:p3", want: &Agent{PaneID: "w1:p3"}},
+	}
+	for _, tt := range tests {
+		got, err := c.PaneAgent(t.Context(), tt.pane)
+		if err != nil {
+			t.Fatalf("PaneAgent(%s) = %v", tt.pane, err)
+		}
+		if diff := cmp.Diff(tt.want, got); diff != "" {
+			t.Errorf("PaneAgent(%s) (-want +got):\n%s", tt.pane, diff)
+		}
+	}
+	if _, err := c.PaneAgent(t.Context(), "w1:p9"); !HasCode(err, "pane_not_found") {
+		t.Errorf("PaneAgent() of a closed pane = %v, want pane_not_found", err)
 	}
 }

@@ -30,6 +30,8 @@ const (
 	CodePaneBusy = "agent_pane_busy"
 	// CodeAgentNotReady means the agent stopped during startup, e.g. at a dialog.
 	CodeAgentNotReady = "agent_not_ready"
+	// CodePaneNotFound means the pane doesn't exist, e.g. it was closed.
+	CodePaneNotFound = "pane_not_found"
 	// CodeAgentBlocked means the agent is waiting at a dialog, so a prompt wasn't sent.
 	CodeAgentBlocked = "agent_blocked"
 )
@@ -144,12 +146,49 @@ func (c *Client) CreateTab(ctx context.Context, workspaceID, cwd, label string) 
 	return v.Result.RootPane.PaneID, nil
 }
 
-// StartAgent starts Claude Code named name in the pane, and waits up to wait until it's
-// ready for input. herdr is given the wait, because its default is 30 seconds.
-func (c *Client) StartAgent(ctx context.Context, name, paneID string, wait time.Duration) error {
-	_, err := c.run(ctx, wait+startMargin, "agent", "start", name, "--kind", "claude", "--pane", paneID,
-		"--timeout", strconv.FormatInt(wait.Milliseconds(), 10))
+// StartAgent starts Claude Code named name in the pane with the arguments args, and waits
+// up to wait until it's ready for input. herdr is given the wait, because its default is
+// 30 seconds. herdr types the command line into the pane's shell, so args must not hold
+// anything the shell interprets.
+func (c *Client) StartAgent(ctx context.Context, name, paneID string, wait time.Duration, args ...string) error {
+	cmdArgs := []string{
+		"agent", "start", name, "--kind", "claude", "--pane", paneID,
+		"--timeout", strconv.FormatInt(wait.Milliseconds(), 10),
+	}
+	if len(args) > 0 {
+		cmdArgs = append(append(cmdArgs, "--"), args...)
+	}
+	_, err := c.run(ctx, wait+startMargin, cmdArgs...)
 	return err
+}
+
+// PaneAgent returns the agent herdr recognizes in the pane. Its Kind is empty when no
+// agent runs there, e.g. Claude Code exited and only the shell is left.
+func (c *Client) PaneAgent(ctx context.Context, paneID string) (*Agent, error) {
+	out, err := c.run(ctx, timeout, "pane", "get", paneID)
+	if err != nil {
+		return nil, err
+	}
+	var v struct {
+		Result struct {
+			Pane struct {
+				PaneID       string `json:"pane_id"`
+				Agent        string `json:"agent"`
+				AgentSession *struct {
+					Value string `json:"value"`
+				} `json:"agent_session"`
+			} `json:"pane"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(out, &v); err != nil {
+		return nil, fmt.Errorf("parse the output of herdr pane get: %w", err)
+	}
+	p := v.Result.Pane
+	agent := &Agent{PaneID: p.PaneID, Kind: p.Agent}
+	if p.AgentSession != nil {
+		agent.SessionID = p.AgentSession.Value
+	}
+	return agent, nil
 }
 
 // Prompt submits the text to the agent. The text is one argument, without a shell.

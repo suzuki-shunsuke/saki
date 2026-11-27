@@ -41,6 +41,9 @@ type Param struct {
 	HerdrPaneID string
 	// Dir is the current directory of saki serve, where Claude Code starts for a new task.
 	Dir string
+	// ClaudeConfigDir is Claude Code's configuration directory, where the records of the
+	// sessions to resume are read from.
+	ClaudeConfigDir string
 }
 
 // Serve serves the task list until ctx is canceled.
@@ -55,9 +58,10 @@ func Serve(ctx context.Context, logger *slog.Logger, param *Param) error {
 	// the URL and are logged even when listen fails.
 	h := herdr.New()
 	handler := NewHandler(logger, param.TasksDir, result.Failures, h, mo.New(), &Launcher{
-		Herdr:  h,
-		PaneID: param.HerdrPaneID,
-		Dir:    param.Dir,
+		Herdr:     h,
+		PaneID:    param.HerdrPaneID,
+		Dir:       param.Dir,
+		ConfigDir: param.ClaudeConfigDir,
 	})
 
 	addr := net.JoinHostPort(host, strconv.Itoa(param.Port))

@@ -73,8 +73,11 @@ const (
 	sessionTabPrefix = "task "
 )
 
-// Launcher starts Claude Code in a new herdr tab to create a task from a description, or
-// to review a pull request.
+// outsideHerdrMessage is the message when saki serve can't create a tab outside herdr.
+const outsideHerdrMessage = "saki serve isn't running in a herdr pane"
+
+// Launcher starts Claude Code in a new herdr tab to create a task from a description, to
+// review a pull request, to start a new session for a task, or to resume a task's session.
 type Launcher struct {
 	Herdr Herdr
 	// PaneID is the herdr pane saki serve runs in (HERDR_PANE_ID). The new tab is created
@@ -88,9 +91,24 @@ type Launcher struct {
 	// Now returns the current time, for the agent's name. It defaults to time.Now.
 	Now func() time.Time
 
+	// ConfigDir is Claude Code's configuration directory, where the records of the
+	// sessions to resume are read from. Empty when it isn't known.
+	ConfigDir string
+	// IsDir reports whether the path is a directory, where a resumed session can start.
+	// It defaults to checking the file system.
+	IsDir func(path string) bool
+
 	// mu makes looking for a review's tab and creating it one step, so that two requests
 	// for the same pull request at once make one tab.
 	mu sync.Mutex
+
+	// resumeMu guards resuming and resumedPanes.
+	resumeMu sync.Mutex
+	// resuming holds the sessions being resumed, so that a second click while one is
+	// starting doesn't start the session twice.
+	resuming map[string]struct{}
+	// resumedPanes maps a session to the pane of the tab created to resume it.
+	resumedPanes map[string]string
 }
 
 type launchRequest struct {
@@ -98,7 +116,8 @@ type launchRequest struct {
 	Kind string `json:"kind"`
 }
 
-// launchJob is what differs between creating a task and reviewing a pull request.
+// launchJob is what differs between creating a task, reviewing a pull request, and
+// resuming a session.
 type launchJob struct {
 	tabLabel string
 	// reuseTab is true when a tab already labeled tabLabel is focused instead of creating
@@ -107,6 +126,13 @@ type launchJob struct {
 	agentPrefix string
 	prompt      string
 	started     string
+	// cwd is the directory Claude Code starts in. Empty means the Launcher's Dir.
+	cwd string
+	// args are the arguments of Claude Code.
+	args []string
+	// failurePrefix starts the message of a failure. Empty means "Failed to start Claude
+	// Code: ".
+	failurePrefix string
 }
 
 // pullRequestURLPattern matches the URL of a GitHub pull request, optionally followed by a
@@ -195,24 +221,38 @@ func sessionJob(tasksDir string, t *task.Task) *launchJob {
 // reviewing it is focused instead, so that the form and the start button don't start two
 // sessions for one review. The URL is built from its parts, as the form does.
 func reviewSessionJob(taskDir string, t *task.Task) *launchJob {
+	label, reuse, prURL := sessionTab(t)
 	job := &launchJob{
-		tabLabel:    sessionTabPrefix + t.Dir,
+		tabLabel:    label,
+		reuseTab:    reuse,
 		agentPrefix: "session",
 		started:     startedSessionMessage(t.Dir),
 	}
 	resume := " Resume the review in " + taskDir + " in this new session."
-	for _, u := range t.PullRequests {
-		owner, repo, number, ok := parsePullRequestURL(u)
-		if !ok {
-			continue
-		}
-		job.tabLabel = reviewTabPrefix + owner + "/" + repo + "#" + number
-		job.reuseTab = true
-		resume = " Resume the review of https://github.com/" + owner + "/" + repo + "/pull/" + number + " in " + taskDir + " in this new session."
-		break
+	if prURL != "" {
+		resume = " Resume the review of " + prURL + " in " + taskDir + " in this new session."
 	}
 	job.prompt = `Run "saki skill show pr-review" and follow the instructions. ` + dedicatedPane + resume + appendSessionPrompt(taskDir)
 	return job
+}
+
+// sessionTab returns the label of the tab of a session for the task t, and whether a tab
+// already labeled so is focused instead of creating another one. A review of pr-review with
+// the URL of a pull request in pull_requests, the first one, has the label of a tab started
+// from the form to review the pull request, so that the form, the start button, and resuming
+// don't start two sessions for one review; the URL, built from its parts, is returned too.
+func sessionTab(t *task.Task) (string, bool, string) {
+	if t.Type == task.TypePRReview {
+		for _, u := range t.PullRequests {
+			owner, repo, number, ok := parsePullRequestURL(u)
+			if !ok {
+				continue
+			}
+			return reviewTabPrefix + owner + "/" + repo + "#" + number, true,
+				"https://github.com/" + owner + "/" + repo + "/pull/" + number
+		}
+	}
+	return sessionTabPrefix + t.Dir, false, ""
 }
 
 // appendSessionPrompt asks the new session to add its own ID to the task's claude_sessions.
@@ -243,18 +283,18 @@ func newLaunchJob(req *launchRequest) (*launchJob, *focusResponse, bool) {
 // left open when it fails, so that what happened can be seen.
 func (l *Launcher) launch(ctx context.Context, logger *slog.Logger, job *launchJob) *focusResponse {
 	if l.PaneID == "" {
-		return &focusResponse{Result: launchOutsideHerdr, Message: "saki serve isn't running in a herdr pane"}
+		return &focusResponse{Result: launchOutsideHerdr, Message: outsideHerdrMessage}
 	}
 	paneID, res := l.openTab(ctx, logger, job)
 	if res != nil {
 		return res
 	}
 	name := l.agentName(job.agentPrefix)
-	if err := l.start(ctx, name, paneID); err != nil {
-		return l.failure(logger, err)
+	if err := l.start(ctx, name, paneID, job.args); err != nil {
+		return l.failure(logger, job, err)
 	}
 	if err := l.Herdr.Prompt(ctx, name, job.prompt); err != nil {
-		return l.failure(logger, err)
+		return l.failure(logger, job, err)
 	}
 	return &focusResponse{Result: launchStarted, Message: job.started}
 }
@@ -283,11 +323,15 @@ func (l *Launcher) openTab(ctx context.Context, logger *slog.Logger, job *launch
 	}
 	workspaceID, err := l.Herdr.PaneWorkspace(ctx, l.PaneID)
 	if err != nil {
-		return "", l.failure(logger, err)
+		return "", l.failure(logger, job, err)
 	}
-	paneID, err := l.Herdr.CreateTab(ctx, workspaceID, l.Dir, job.tabLabel)
+	cwd := job.cwd
+	if cwd == "" {
+		cwd = l.Dir
+	}
+	paneID, err := l.Herdr.CreateTab(ctx, workspaceID, cwd, job.tabLabel)
 	if err != nil {
-		return "", l.failure(logger, err)
+		return "", l.failure(logger, job, err)
 	}
 	return paneID, nil
 }
@@ -332,12 +376,12 @@ func tabFailure(logger *slog.Logger, prefix string, err error) *focusResponse {
 // start starts Claude Code, trying again only while the new pane's shell isn't at its
 // prompt yet. Any other error is final: Claude Code may already be starting, and trying
 // again would type "claude" into it.
-func (l *Launcher) start(ctx context.Context, name, paneID string) error {
+func (l *Launcher) start(ctx context.Context, name, paneID string, args []string) error {
 	deadline := l.now().Add(l.timeout())
 	for {
 		// herdr's errors are returned as they are, because their message is shown to the
 		// user and their code decides the result.
-		err := l.Herdr.StartAgent(ctx, name, paneID, deadline.Sub(l.now()))
+		err := l.Herdr.StartAgent(ctx, name, paneID, deadline.Sub(l.now()), args...)
 		if !herdr.HasCode(err, herdr.CodePaneBusy) {
 			return err //nolint:wrapcheck
 		}
@@ -353,15 +397,19 @@ func (l *Launcher) start(ctx context.Context, name, paneID string) error {
 	}
 }
 
-func (l *Launcher) failure(logger *slog.Logger, err error) *focusResponse {
+func (l *Launcher) failure(logger *slog.Logger, job *launchJob, err error) *focusResponse {
 	switch {
 	case herdr.IsNotRunning(err):
 		return &focusResponse{Result: launchUnavailable, Message: herdrNotRunningMessage}
 	case herdr.HasCode(err, herdr.CodeAgentNotReady), herdr.HasCode(err, herdr.CodeAgentBlocked):
 		return &focusResponse{Result: launchBlocked, Message: "Claude Code is waiting for input in the new tab"}
 	}
-	logger.Error("start Claude Code in a new herdr tab", "error", err)
-	return &focusResponse{Result: launchError, Message: "Failed to start Claude Code: " + err.Error()}
+	prefix := job.failurePrefix
+	if prefix == "" {
+		prefix = "Failed to start Claude Code: "
+	}
+	logger.Error("start Claude Code in a new herdr tab", "error", err, "tab", job.tabLabel)
+	return &focusResponse{Result: launchError, Message: prefix + err.Error()}
 }
 
 // agentName returns a name herdr accepts ([a-z][a-z0-9_-]{0,31}), unique enough even for

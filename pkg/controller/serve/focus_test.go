@@ -36,8 +36,14 @@ type fakeHerdr struct {
 	calls     []string
 	starts    int
 	prompted  string
-	// agent is the name of the last agent started.
+	// agent is the name of the last agent started, and args its arguments.
 	agent string
+	args  []string
+
+	// paneAgents are the agents PaneAgent returns by pane; a pane missing here is closed.
+	paneAgents map[string]*herdr.Agent
+	// paneAgentErr, if not nil, is returned by PaneAgent for a pane missing in paneAgents.
+	paneAgentErr error
 
 	// tabs are the tabs ListTabs returns. CreateTab adds the tab it creates, as tab w1:tN.
 	tabs        []herdr.Tab
@@ -82,11 +88,12 @@ func (f *fakeHerdr) FocusTab(_ context.Context, tabID string) error {
 	return f.focusTabErr
 }
 
-func (f *fakeHerdr) StartAgent(_ context.Context, name, paneID string, _ time.Duration) error {
+func (f *fakeHerdr) StartAgent(_ context.Context, name, paneID string, _ time.Duration, args ...string) error {
 	f.record("agent start " + paneID)
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.agent = name
+	f.args = args
 	if !agentNamePattern.MatchString(name) {
 		return errors.New("invalid agent name " + name)
 	}
@@ -103,6 +110,19 @@ func (f *fakeHerdr) Prompt(_ context.Context, _, text string) error {
 	defer f.mu.Unlock()
 	f.prompted = text
 	return f.promptErr
+}
+
+func (f *fakeHerdr) PaneAgent(_ context.Context, paneID string) (*herdr.Agent, error) {
+	f.record("pane agent " + paneID)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if a, ok := f.paneAgents[paneID]; ok {
+		return a, nil
+	}
+	if f.paneAgentErr != nil {
+		return nil, f.paneAgentErr
+	}
+	return nil, &herdr.Error{Code: herdr.CodePaneNotFound, Message: "pane " + paneID + " not found"}
 }
 
 func (f *fakeHerdr) ListAgents(context.Context) ([]herdr.Agent, error) {
