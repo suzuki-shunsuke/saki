@@ -1,6 +1,6 @@
 # PR Explanation as HTML
 
-Normally write the PR Explanation in Markdown (`reviews/<owner>/<repo>/<pr number>/pr-explanation.md`). Use this HTML only for pull requests whose diff is too long to read comfortably in Markdown.
+Normally write the PR Explanation in Markdown (`tasks/<review id>/pr-explanation.md`). Use this HTML only for pull requests whose diff is too long to read comfortably in Markdown.
 
 Write the PR Explanation as a spec (JSON) and turn it into HTML with the script `saki skill show pr-review scripts/render-pr-explanation.py` prints.
 The HTML puts the code (diff) on the left and the explanation on the right. Each line range in the explanation gets a numbered chip (① L189-193), and the same range on the code side gets a badge with the same number and a vertical bar.
@@ -14,9 +14,9 @@ git diff <base>...<head> > /tmp/pr.diff   # or: gh pr diff <number> > /tmp/pr.di
 script=$(mktemp)
 saki skill show pr-review scripts/render-pr-explanation.py > "$script"
 python3 -I "$script" \
-  --spec reviews/<owner>/<repo>/<pr number>/pr-explanation.json \
+  --spec tasks/<review id>/pr-explanation.json \
   --diff /tmp/pr.diff \
-  --out reviews/<owner>/<repo>/<pr number>/pr-explanation.html
+  --out tasks/<review id>/pr-explanation.html
 ```
 
 Even if you do not explain test files, pass the diff as is. Only the files and lines specified in the spec are shown.
@@ -26,7 +26,7 @@ If a marker points to a line not shown in its step, the script stops with an err
 ## Viewing
 
 ```sh
-open reviews/<owner>/<repo>/<pr number>/pr-explanation.html
+open tasks/<review id>/pr-explanation.html
 ```
 
 Take the human's questions in conversation with the agent, and fix the spec and regenerate if needed.

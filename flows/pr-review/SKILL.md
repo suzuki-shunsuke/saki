@@ -14,11 +14,15 @@ description: When asked to review a pull request created by someone else, genera
 
 Start this flow when a human asks you to review or understand a pull request, even if the skill is not explicitly invoked.
 
-Pull requests created and managed with dev-flow (pull requests with a corresponding task in tasks/) are out of scope. For those, follow the dev-flow flow (`saki skill show dev-flow`).
+Pull requests created and managed with dev-flow are out of scope: a pull request listed in `pull_requests` of a task in tasks/ whose `type` isn't `pr-review`. For those, follow the dev-flow flow (`saki skill show dev-flow`). A review's own task (`type: pr-review`) doesn't make its pull request out of scope.
 
-1. Look for documents corresponding to the request in `reviews/<owner>/<repo>/<pr number>/`
-1. If there are none, start from step 1 of Steps
-1. If there are, compare the Reviewed Head recorded in the documents with the pull request's current head. If the pull request has been updated, follow "When the Pull Request Is Updated"; otherwise resume from step 5 of Steps
+1. Look for the review of the pull request in `tasks/<review id>/` (see "Review ID"). If you are given the directory of a review but not the pull request, as when a session is started from the review's start button in `saki serve`, get the pull request from `pull_requests` in its task.yaml, and ask the human if there is none
+1. If there is no such directory, start from step 1 of Steps
+1. If the directory has no task.yaml (the review stopped in step 1 before creating it), create task.yaml (see "task.yaml") and continue step 1
+1. Otherwise, append this session's ID to `claude_sessions` (see "task.yaml"), and resume according to `status`
+    - `doing` (the review stopped in steps 1-4): determine the progress from which sections are filled in and the record in details.md, and continue from the next step. If review.md has no Reviewed Head yet, continue step 1. If it has one and the pull request's head is newer, first move to the new head: record the change in details.md, update the documents already written according to the diff (`git diff <reviewed head>..<new head>`), point the worktree and the code links at the new head, and update Reviewed Head. Then continue from the step where the review stopped. Don't use "When the Pull Request Is Updated", which is for reviews that finished step 4 and returns to step 5
+    - `in-review` or `done`: compare the Reviewed Head recorded in the documents with the pull request's current head. If the pull request has been updated, follow "When the Pull Request Is Updated"; otherwise resume from step 5 of Steps
+    - `pending` or `cancel`: ask the human whether to resume the review
 
 Work on each review in its own herdr pane.
 
@@ -28,16 +32,59 @@ Work on each review in its own herdr pane.
 ## Document Layout
 
 ```
-reviews/
-  <owner>/<repo>/<pr number>/
+tasks/
+  <review id>/
+    task.yaml
     review.md
     details.md
     pr-explanation.md
 ```
 
+A review is a kind of task: it sits in tasks/ beside the tasks of dev-flow, with `type: pr-review` in its task.yaml, so that `saki serve` lists it with the other tasks.
+
+- `task.yaml`: the review's metadata, generated from `saki skill show pr-review templates/task.yaml` (see "task.yaml")
 - `review.md`: the main document, generated from `saki skill show pr-review templates/review.md`. It summarizes the overview, specification, and review results, and is what the human reads first
 - `details.md`: the record of primary information and decisions. Write the collected information (commands and the gist of their output, URLs of referenced issues, related pull requests, Slack threads, etc.), the evidence behind guesses, and for each finding of the agent's review whether it was adopted or rejected and why. Keep it separate from review.md because it tends to grow large
 - `pr-explanation.md`: the PR Explanation (see "PR Explanation")
+
+### Review ID
+
+The review id is `review_<owner>_<repo>_<pr number>`, with the owner and the repository in lower case. For example, the review of `https://github.com/Suzuki-Shunsuke/tfaction/pull/4404` is in `tasks/review_suzuki-shunsuke_tfaction_4404/`.
+
+- The id follows from the pull request, so don't ask the human to confirm it
+- It's unique: GitHub owners can't contain `_`, and the pull request number is digits only. The owner and the repository are lower-cased because GitHub ignores their case, so that differently written URLs of one pull request don't make two reviews
+- Don't rename the herdr tab after the review id. A review started from `saki serve` runs in a tab labeled `review <owner>/<repo>#<number>`, which `saki serve` uses to find the tab already reviewing the pull request
+
+### task.yaml
+
+Create task.yaml from `saki skill show pr-review templates/task.yaml` right after getting the pull request's information with `gh pr view` in step 1, before writing any other document, so that the review shows up in `saki serve` as soon as it starts.
+
+| Key | Value |
+|-----|-------|
+| `name` | the review id |
+| `description` | `Review <owner>/<repo>#<pr number>: <pull request title>` |
+| `type` | `pr-review` |
+| `status` | see below |
+| `tags` | may be empty (the human may add tags) |
+| `claude_sessions` | the sessions that worked on the review |
+| `repositories` | `https://github.com/<owner>/<repo>` |
+| `issues` | the URLs of the issues the pull request closes (`closingIssuesReferences`), or empty |
+| `pull_requests` | `https://github.com/<owner>/<repo>/pull/<pr number>` |
+| `parent_task`, `sub_tasks`, `derived_from`, `derived_tasks` | empty |
+
+Every session that works on the review appends its ID (the environment variable `CLAUDE_CODE_SESSION_ID`) and a summary of the session to the end of `claude_sessions`, when it creates task.yaml or when it resumes the review. Skip it if the session is already listed. This lets a click on the review's row in `saki serve` focus the session's pane.
+
+Update `status` as the review progresses.
+
+| When | status |
+|------|--------|
+| task.yaml is created in step 1, through step 4 (the agent works autonomously) | `doing` |
+| Entering step 5, and during step 6 | `in-review` |
+| The human says the review is finished (the comments are posted, the review is no longer needed, etc.) | `done` |
+| "When the Pull Request Is Updated" starts (even from `done`) | `doing`, then `in-review` on returning to step 5 |
+| A `done` review is resumed without an update of the pull request (to reread the documents or ask questions) | stays `done`. Set `in-review` only when the human asks to redo the review |
+
+Use `pending` and `cancel` only when the human says so.
 
 ## Steps
 
@@ -45,6 +92,7 @@ reviews/
 
 1. Get the pull request's information
     - `gh pr view <number> -R <owner>/<repo> --json title,body,author,baseRefName,headRefName,headRefOid,files,additions,deletions,labels,closingIssuesReferences,url`
+    - Right after this, create `tasks/<review id>/task.yaml` and append this session's ID to `claude_sessions` (see "task.yaml")
     - `gh pr diff <number> -R <owner>/<repo>`
     - Existing review comments and conversations (`gh pr view --comments`, `gh api repos/<owner>/<repo>/pulls/<number>/comments`)
     - CI results (`gh pr checks`)
@@ -116,7 +164,8 @@ Write improvement ideas outside the pull request's purpose in Follow-ups, not in
 
 ### 5. Hand Over to the Human
 
-1. Open the documents with `mo` (`mo reviews/<owner>/<repo>/<pr number>/review.md reviews/<owner>/<repo>/<pr number>/pr-explanation.md`)
+1. Set `status` to `in-review`, unless a `done` review was resumed without an update of the pull request (see "task.yaml")
+1. Open the documents with `mo` (`mo tasks/<review id>/review.md tasks/<review id>/pr-explanation.md`)
 1. The human reads the documents and asks questions in conversation with the agent. The agent answers and reflects the answers in the documents if needed (mo reloads automatically on save)
 1. The human decides which Review Findings to comment on the pull request, and whether to Approve, Request changes, or Comment
 
@@ -125,9 +174,11 @@ Write improvement ideas outside the pull request's purpose in Follow-ups, not in
 1. Draft review comments from the findings the human chose, and show them to the human. The pull request author reads them, so do not reuse the documents' internal notation (`(guess)`, severity labels, etc.) as is; write prose that conveys the evidence and suggestion.
 1. Post them only after getting the human's approval. Approve or Request changes only when the human explicitly instructs it
 1. Record the URLs of the posted comments in details.md and update the status of the Review Findings
+1. When the human says the review is finished, set `status` to `done`
 
 ## When the Pull Request Is Updated
 
+1. Set `status` to `doing`
 1. Check the diff from the Reviewed Head to the new head (`git diff <reviewed head>..<new head>` or GitHub's compare)
 1. Update review.md and pr-explanation.md according to the diff. Repoint code links to the new head's SHA
 1. Have an agent review the added diff under the same rules as step 4 of Steps. Also check whether existing Review Findings have been resolved, and update their status
@@ -163,7 +214,7 @@ How to write:
 
 ### Format
 
-Write it in Markdown in `reviews/<owner>/<repo>/<pr number>/pr-explanation.md`. Order each step as "explanation → link → code snippet", so reading from top to bottom follows the order in which the code is read.
+Write it in Markdown in `tasks/<review id>/pr-explanation.md`. Order each step as "explanation → link → code snippet", so reading from top to bottom follows the order in which the code is read.
 
 ````markdown
 # PR Explanation: <pull request title>

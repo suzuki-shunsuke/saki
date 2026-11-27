@@ -74,6 +74,8 @@ func moTasksDir(t *testing.T) (string, map[string][]string) {
 	writeTask(t, dir, "both", "name: both\n")
 	writeTask(t, dir, "details_only", "name: details_only\n")
 	writeTask(t, dir, "empty", "name: empty\n")
+	writeTask(t, dir, "review", "name: review\ntype: pr-review\n")
+	writeTask(t, dir, "review_partial", "name: review_partial\ntype: pr-review\n")
 	want := map[string][]string{
 		"all": {
 			writeDoc(t, dir, "all", "all.md"),
@@ -91,8 +93,20 @@ func moTasksDir(t *testing.T) (string, map[string][]string) {
 		"details_only": {
 			writeDoc(t, dir, "details_only", "details.md"),
 		},
+		// A review of pr-review has review.md as the main document.
+		"review": {
+			writeDoc(t, dir, "review", "review.md"),
+			writeDoc(t, dir, "review", "details.md"),
+			writeDoc(t, dir, "review", "pr-explanation.md"),
+		},
+		// <dir>.md and README.md aren't the main document of a review.
+		"review_partial": {
+			writeDoc(t, dir, "review_partial", "details.md"),
+		},
 	}
 	writeDoc(t, dir, "both", "README.md")
+	writeDoc(t, dir, "review_partial", "review_partial.md")
+	writeDoc(t, dir, "review_partial", "README.md")
 	// A directory isn't a document.
 	if err := os.Mkdir(filepath.Join(dir, "empty", "details.md"), 0o700); err != nil {
 		t.Fatal(err)
@@ -110,7 +124,7 @@ type moCase struct {
 }
 
 func moCases() []moCase {
-	return []moCase{
+	return append(reviewMoCases(), []moCase{
 		{
 			name:      "all documents",
 			task:      "all",
@@ -164,6 +178,24 @@ func moCases() []moCase {
 			task:      "all",
 			err:       &mo.PartialError{Added: 1, Total: 3},
 			want:      moResult{Result: "error", Message: "Failed to open all in mo: added 1 of 3 files"},
+			wantFiles: true,
+		},
+	}...)
+}
+
+// reviewMoCases are the cases of reviews of pr-review, whose main document is review.md.
+func reviewMoCases() []moCase {
+	return []moCase{
+		{
+			name:      "review",
+			task:      "review",
+			want:      moResult{Result: "opened", Message: "Opened review in mo", URL: "http://localhost:6275/review"},
+			wantFiles: true,
+		},
+		{
+			name:      "review without review.md",
+			task:      "review_partial",
+			want:      moResult{Result: "opened", Message: "Opened review_partial in mo", URL: "http://localhost:6275/review_partial"},
 			wantFiles: true,
 		},
 	}

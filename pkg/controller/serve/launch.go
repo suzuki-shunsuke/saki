@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/suzuki-shunsuke/saki/pkg/herdr"
+	"github.com/suzuki-shunsuke/saki/pkg/task"
 )
 
 // The results of a launch request.
@@ -110,7 +111,7 @@ type launchJob struct {
 
 // pullRequestURLPattern matches the URL of a GitHub pull request, optionally followed by a
 // path, a query, or a fragment. The owner and the repository are limited to the characters
-// GitHub allows, because pr-review writes to reviews/<owner>/<repo>/<number>/. (?i) isn't
+// GitHub allows, because pr-review writes to tasks/review_<owner>_<repo>_<number>/. (?i) isn't
 // used: its Unicode case folding would let non-ASCII characters such as "ſ" through.
 var pullRequestURLPattern = regexp.MustCompile(`^https://github\.com/([A-Za-z0-9-]+)/([A-Za-z0-9._-]+)/pull/([0-9]+)(?:[/?#].*)?$`)
 
@@ -168,20 +169,59 @@ func reviewJob(text string) (*launchJob, *focusResponse) {
 	}, nil
 }
 
-// sessionJob returns the job to start a new Claude Code session for the task in the
-// directory dir of tasksDir, so that the task is worked on in its own session rather than
-// in the session it was created in. The session adds its own ID to claude_sessions, so
-// that clicking the task's row focuses it afterwards.
-func sessionJob(tasksDir, dir string) *launchJob {
-	taskDir := filepath.ToSlash(filepath.Join(tasksDir, dir))
+// sessionJob returns the job to start a new Claude Code session for the task t of tasksDir,
+// so that the task is worked on in its own session rather than in the session it was
+// created in. The session adds its own ID to claude_sessions, so that clicking the task's
+// row focuses it afterwards. A review of pr-review is resumed with pr-review (see
+// reviewSessionJob).
+func sessionJob(tasksDir string, t *task.Task) *launchJob {
+	taskDir := filepath.ToSlash(filepath.Join(tasksDir, t.Dir))
+	if t.Type == task.TypePRReview {
+		return reviewSessionJob(taskDir, t)
+	}
 	return &launchJob{
-		tabLabel:    sessionTabPrefix + dir,
+		tabLabel:    sessionTabPrefix + t.Dir,
 		agentPrefix: "session",
 		prompt: `Run "saki skill show dev-flow" and follow the instructions. ` + dedicatedPane +
 			" Work on the task in " + taskDir + " in this new session." +
-			" Append this session's ID (the environment variable CLAUDE_CODE_SESSION_ID) to the end of claude_sessions in " + taskDir + "/task.yaml.",
-		started: "Started a new Claude Code session for " + dir + " in a new tab",
+			appendSessionPrompt(taskDir),
+		started: startedSessionMessage(t.Dir),
 	}
+}
+
+// reviewSessionJob returns the job to resume the review t in taskDir with pr-review in a
+// new session. With the URL of a pull request in pull_requests, the first one, its tab has
+// the label of a tab started from the form to review the pull request, and a tab already
+// reviewing it is focused instead, so that the form and the start button don't start two
+// sessions for one review. The URL is built from its parts, as the form does.
+func reviewSessionJob(taskDir string, t *task.Task) *launchJob {
+	job := &launchJob{
+		tabLabel:    sessionTabPrefix + t.Dir,
+		agentPrefix: "session",
+		started:     startedSessionMessage(t.Dir),
+	}
+	resume := " Resume the review in " + taskDir + " in this new session."
+	for _, u := range t.PullRequests {
+		owner, repo, number, ok := parsePullRequestURL(u)
+		if !ok {
+			continue
+		}
+		job.tabLabel = reviewTabPrefix + owner + "/" + repo + "#" + number
+		job.reuseTab = true
+		resume = " Resume the review of https://github.com/" + owner + "/" + repo + "/pull/" + number + " in " + taskDir + " in this new session."
+		break
+	}
+	job.prompt = `Run "saki skill show pr-review" and follow the instructions. ` + dedicatedPane + resume + appendSessionPrompt(taskDir)
+	return job
+}
+
+// appendSessionPrompt asks the new session to add its own ID to the task's claude_sessions.
+func appendSessionPrompt(taskDir string) string {
+	return " Append this session's ID (the environment variable CLAUDE_CODE_SESSION_ID) to the end of claude_sessions in " + taskDir + "/task.yaml."
+}
+
+func startedSessionMessage(dir string) string {
+	return "Started a new Claude Code session for " + dir + " in a new tab"
 }
 
 // newLaunchJob returns the job of the request's kind, or a response when its text is
@@ -398,7 +438,7 @@ func serveStart(w http.ResponseWriter, r *http.Request, logger *slog.Logger, l *
 		res = &focusResponse{Result: focusUnknownTask, Message: dir + " isn't found"}
 	} else {
 		// As with serveLaunch, starting goes on even if the browser goes away.
-		res = l.launch(context.WithoutCancel(r.Context()), logger, sessionJob(tasksDir, t.Dir))
+		res = l.launch(context.WithoutCancel(r.Context()), logger, sessionJob(tasksDir, t))
 	}
 	if res.Result != launchError {
 		logger.Info("start a new Claude Code session for the task in a new herdr tab", "task", dir, "result", res.Result, "message", res.Message)

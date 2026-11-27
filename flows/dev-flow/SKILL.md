@@ -22,7 +22,7 @@ Start this flow when a human asks for an implementation, even if the skill is no
 However, do not start it for small changes that need no design, such as typo fixes, dependency updates, or fixes of a few lines.
 If a human judges it necessary and explicitly invokes the skill, start the flow regardless of the size of the change.
 
-1. Look in tasks/ for a task corresponding to the request
+1. Look in tasks/ for a task corresponding to the request. Skip tasks whose `type` is `pr-review`: they are reviews of pull requests created by others, handled by the pr-review flow (`saki skill show pr-review`), not this flow
 1. If there is none, generate the task documents from the templates before writing any code, write Background / What / Why / Scope / Out of Scope, and ask the human for a review (start from step 1 of Steps). If the request is too vague to write these, ask what they want implemented
     - If what to do (What) is not yet decided and investigation or organizing information is needed to decide it, start an investigation task (see "Investigation Tasks")
 1. If there is one, determine the progress from task.yaml's `type` and `status`, which sections are filled in, and the decision log in details.md, and resume from the next step. Name the herdr tab after the task (see "Naming the herdr Tab")
@@ -98,6 +98,7 @@ name: aws-provider-v6 # same as the task id
 description: Update the Terraform AWS Provider to v6
 # implementation - a task that implements and creates a pull request
 # investigation - a task that investigates and organizes information to decide what to do (see "Investigation Tasks")
+# pr-review - a review of a pull request created by someone else. It is created and handled by the pr-review flow (`saki skill show pr-review`), not this flow
 type: implementation
 # backlog - not started this week
 # todo - doing this week but not started

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/suzuki-shunsuke/saki/pkg/mo"
+	"github.com/suzuki-shunsuke/saki/pkg/task"
 )
 
 // Mo opens files in a group of mo, the Markdown viewer. *mo.Client implements it.
@@ -38,7 +39,7 @@ func openInMo(ctx context.Context, logger *slog.Logger, m Mo, tasksDir, dir stri
 	if t == nil {
 		return &moResponse{Result: moUnknownTask, Message: dir + " isn't found"}
 	}
-	files, err := taskDocuments(filepath.Join(tasksDir, t.Dir), t.Dir)
+	files, err := taskDocuments(filepath.Join(tasksDir, t.Dir), t)
 	if err != nil {
 		logger.Error("find the documents of the task", "task", dir, "error", err)
 		return &moResponse{Result: moError, Message: "Failed to open " + dir + " in mo: " + err.Error()}
@@ -61,11 +62,16 @@ func openInMo(ctx context.Context, logger *slog.Logger, m Mo, tasksDir, dir stri
 }
 
 // taskDocuments returns the absolute paths of the task's documents which exist, in the order
-// they're shown: the design document (<dir>.md, or README.md in old tasks), details.md, and
-// pr-explanation.md.
-func taskDocuments(taskDir, dir string) ([]string, error) {
+// they're shown: the main document, details.md, and pr-explanation.md. The main document is
+// review.md for a review of pr-review, and the design document (<dir>.md, or README.md in
+// old tasks) for the other tasks.
+func taskDocuments(taskDir string, t *task.Task) ([]string, error) {
+	main := []string{t.Dir + ".md", "README.md"}
+	if t.Type == task.TypePRReview {
+		main = []string{"review.md"}
+	}
 	candidates := [][]string{
-		{dir + ".md", "README.md"},
+		main,
 		{"details.md"},
 		{"pr-explanation.md"},
 	}

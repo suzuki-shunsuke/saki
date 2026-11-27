@@ -22,6 +22,10 @@ const DefaultDir = "tasks"
 // FileName is the name of the file holding a task's metadata.
 const FileName = "task.yaml"
 
+// TypePRReview is the type of a review of a pull request created by someone else, which
+// is managed with the pr-review flow rather than dev-flow.
+const TypePRReview = "pr-review"
+
 // Task is the metadata of a task, read from its task.yaml.
 type Task struct {
 	Name           string           `yaml:"name"`
