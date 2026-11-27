@@ -16,7 +16,7 @@ Start this flow when a human asks you to review or understand a pull request, ev
 
 Pull requests created and managed with dev-flow are out of scope: a pull request listed in `pull_requests` of a task in tasks/ whose `type` isn't `pr-review`. For those, follow the dev-flow flow (`saki skill show dev-flow`). A review's own task (`type: pr-review`) doesn't make its pull request out of scope.
 
-1. Look for the review of the pull request in `tasks/<review id>/` (see "Review ID"). If you are given the directory of a review but not the pull request, as when a session is started from the review's start button in `saki serve`, get the pull request from `pull_requests` in its task.yaml, and ask the human if there is none
+1. Look for the review of the pull request in `tasks/<review id>/` (see "Review ID"). If you are given the directory of a review but not the pull request, as when a session is started with the review's new or open button in `saki serve`, get the pull request from `pull_requests` in its task.yaml, and ask the human if there is none
 1. If there is no such directory, start from step 1 of Steps
 1. If the directory has no task.yaml (the review stopped in step 1 before creating it), create task.yaml (see "task.yaml") and continue step 1
 1. Otherwise, append this session's ID to `claude_sessions` (see "task.yaml"), and resume according to `status`
@@ -76,7 +76,7 @@ Create task.yaml from `saki skill show pr-review templates/task.yaml` right afte
 
 Run `saki assignee` when creating task.yaml, and set `assignees` to a list of the one login it prints. This tells whose review a review is when tasks/ is shared with git. If it fails, leave `assignees` empty (`[]`), tell the human in a sentence with its error, and continue. Don't retry. Don't change `assignees` afterwards, even when you resume a review created by someone else, and don't add it to a task.yaml that has none. The human edits it to add or change the people in charge.
 
-Every session that works on the review appends its ID (the environment variable `CLAUDE_CODE_SESSION_ID`) and a summary of the session to the end of `claude_sessions`, when it creates task.yaml or when it resumes the review. Skip it if the session is already listed. This lets a click on the review's row in `saki serve` focus the session's pane.
+Every session that works on the review appends its ID (the environment variable `CLAUDE_CODE_SESSION_ID`) and a summary of the session to the end of `claude_sessions`, when it creates task.yaml or when it resumes the review. Skip it if the session is already listed. This lets the review's open button in `saki serve` focus the session's pane.
 
 Update `status` as the review progresses.
 

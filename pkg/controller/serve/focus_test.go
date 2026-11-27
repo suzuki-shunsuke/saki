@@ -147,9 +147,9 @@ type focusResult struct {
 	Message string `json:"message"`
 }
 
-func postFocus(t *testing.T, h http.Handler, body, contentType, origin string) *httptest.ResponseRecorder {
+func postOpen(t *testing.T, h http.Handler, body, contentType, origin string) *httptest.ResponseRecorder {
 	t.Helper()
-	return postFocusPath(t, h, "/focus", body, contentType, origin)
+	return postFocusPath(t, h, "/open", body, contentType, origin)
 }
 
 func postFocusPath(t *testing.T, h http.Handler, path, body, contentType, origin string) *httptest.ResponseRecorder {
@@ -273,7 +273,7 @@ func focusNotFocusedCases() []focusCase {
 	}
 }
 
-func TestFocus(t *testing.T) {
+func TestOpen(t *testing.T) {
 	t.Parallel()
 	tests := focusCases()
 	for _, tt := range tests {
@@ -284,7 +284,7 @@ func TestFocus(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			rec := postFocus(t, h, string(body), "application/json", "http://127.0.0.1:8080")
+			rec := postOpen(t, h, string(body), "application/json", "http://127.0.0.1:8080")
 			if rec.Code != http.StatusOK {
 				t.Fatalf("status = %d, want 200", rec.Code)
 			}
@@ -302,7 +302,7 @@ func TestFocus(t *testing.T) {
 	}
 }
 
-func TestFocusRejected(t *testing.T) {
+func TestOpenRejected(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name        string
@@ -323,7 +323,7 @@ func TestFocusRejected(t *testing.T) {
 			t.Parallel()
 			f := &fakeHerdr{agents: []herdr.Agent{{PaneID: "w1:p1", Kind: "claude", SessionID: "s1"}}}
 			h := serve.NewHandler(slog.New(slog.DiscardHandler), focusTasksDir(t), nil, f, nil, nil)
-			rec := postFocus(t, h, tt.body, tt.contentType, tt.origin)
+			rec := postOpen(t, h, tt.body, tt.contentType, tt.origin)
 			if rec.Code != tt.want {
 				t.Errorf("status = %d, want %d", rec.Code, tt.want)
 			}
@@ -331,5 +331,44 @@ func TestFocusRejected(t *testing.T) {
 				t.Errorf("focused %v on a rejected request", f.focused)
 			}
 		})
+	}
+}
+
+// TestOpenStartsNewSession opens a task without a session: a new session is started as the
+// new button does.
+func TestOpenStartsNewSession(t *testing.T) {
+	t.Parallel()
+	dir := emptyTasksDir(t)
+	writeTask(t, dir, "two", "name: two\n")
+	f := &fakeHerdr{startErrs: []error{busy()}}
+	h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, f, nil, newLauncher(f))
+	rec := postOpen(t, h, `{"task":"two"}`, "application/json", "http://127.0.0.1:8080")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	got := focusResult{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	want := focusResult{Result: "started", Message: "Started a new Claude Code session for two in a new tab"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("response (-want +got):\n%s", diff)
+	}
+	// herdr's agents aren't listed: the task has no session to look for.
+	wantCalls := []string{
+		"pane get w1:p1",
+		"tab create w1 /repo/saki task two",
+		"agent start w1:p9", "agent start w1:p9",
+		"agent prompt",
+	}
+	if diff := cmp.Diff(wantCalls, f.calls); diff != "" {
+		t.Errorf("calls (-want +got):\n%s", diff)
+	}
+	if !strings.HasPrefix(f.prompted, `Run "saki skill show dev-flow" and follow the instructions.`) ||
+		!strings.Contains(f.prompted, "Work on the task in ") {
+		t.Errorf("prompt = %q, want the new button's", f.prompted)
+	}
+	if !strings.HasPrefix(f.agent, "session-") {
+		t.Errorf("agent name = %q, want session-...", f.agent)
 	}
 }

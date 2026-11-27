@@ -49,11 +49,15 @@ task.yaml of every directory under the tasks directory of the current directory,
 to task.yaml show up on reload.
 It stops on SIGINT (Ctrl-C) or SIGTERM.
 
-Clicking a task's row focuses the herdr pane where Claude Code runs the task's session, the
+A task's open button focuses the herdr pane where Claude Code runs the task's session, the
 one written last in claude_sessions among those with a pane. If no session has a pane, it
 resumes the session written last (claude --resume) in a new herdr tab, in the directory the
-session was last working in. This needs herdr's Claude Code integration
-(herdr integration install claude), which tells herdr the session of each pane.
+session was last working in. If the task has no session, it starts a new one as the new
+button does. This needs herdr's Claude Code integration (herdr integration install claude),
+which tells herdr the session of each pane.
+
+A task's new button starts a new Claude Code session for the task in a new herdr tab, even
+if the task already has a session.
 
 The form at the top of the page starts Claude Code in a new herdr tab. Claude Code is
 told to run "saki skill show dev-flow" (or pr-review) and follow it, so saki needs to be

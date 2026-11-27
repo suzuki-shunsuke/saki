@@ -44,9 +44,6 @@ th {
   align-items: center;
   gap: 8px;
 }
-tbody tr {
-  cursor: pointer;
-}
 #launch {
   display: flex;
   align-items: flex-end;
@@ -58,7 +55,7 @@ tbody tr {
   max-width: 100%;
   font: inherit;
 }
-.mo-button, .start-button {
+.mo-button, .new-button, .open-button {
   float: right;
   margin-left: 8px;
   font-size: 0.8em;
@@ -110,7 +107,7 @@ tbody tr {
 <tr>{{range .Columns}}<th data-col="{{.Key}}">{{.Key}}</th>{{end}}</tr>
 </thead>
 <tbody>
-{{range .Rows}}<tr data-dir="{{.Dir}}" data-name="{{.Name}}" data-description="{{.Description}}" data-status="{{.Status}}" data-tags="{{.Tags}}" data-repos="{{.Repos}}" data-issues="{{.Issues}}" data-prs="{{.PRs}}">{{range .Cells}}<td data-col="{{.Key}}">{{if eq .Key "name"}}<button type="button" class="mo-button" title="Open the documents in mo">mo</button><button type="button" class="start-button" title="Start a new Claude Code session for this task in a new herdr tab">start</button>{{end}}{{range .Items}}<div>{{if .URL}}<a href="{{.URL}}" title="{{.URL}}" target="_blank" rel="noopener noreferrer">{{.Text}}</a>{{else}}{{.Text}}{{end}}</div>{{end}}</td>{{end}}</tr>
+{{range .Rows}}<tr data-dir="{{.Dir}}" data-name="{{.Name}}" data-description="{{.Description}}" data-status="{{.Status}}" data-tags="{{.Tags}}" data-repos="{{.Repos}}" data-issues="{{.Issues}}" data-prs="{{.PRs}}">{{range .Cells}}<td data-col="{{.Key}}">{{if eq .Key "name"}}<button type="button" class="mo-button" title="Open the documents in mo">mo</button><button type="button" class="new-button" title="Start a new Claude Code session for this task in a new herdr tab">new</button><button type="button" class="open-button" title="Open the Claude Code session of this task: focus its herdr pane, resume it in a new herdr tab if it has no pane, or start a new session if the task has none">open</button>{{end}}{{range .Items}}<div>{{if .URL}}<a href="{{.URL}}" title="{{.URL}}" target="_blank" rel="noopener noreferrer">{{.Text}}</a>{{else}}{{.Text}}{{end}}</div>{{end}}</td>{{end}}</tr>
 {{end}}</tbody>
 </table>
 <p id="no-match" hidden>No tasks match.</p>
@@ -447,31 +444,6 @@ const postJSON = (path, body) => fetch(path, {
 });
 
 (() => {
-  // Clicking a row asks the server to focus the herdr pane of the task's Claude Code session,
-  // or to resume the session in a new tab when it has no pane. A click on a link only opens the link, a click on a button does what the button does,
-  // and selecting text doesn't ask.
-  document.querySelector("tbody").addEventListener("click", async (e) => {
-    if (e.target.closest("a, button")) {
-      return;
-    }
-    if (String(window.getSelection()) !== "") {
-      return;
-    }
-    const tr = e.target.closest("tr");
-    if (!tr) {
-      return;
-    }
-    try {
-      const res = await postJSON("/focus", { task: tr.dataset.dir ?? "" });
-      // A tab already reviewing the pull request isn't a success, as with the form and the
-      // start button.
-      const result = await readResult(res, ["focused", "resumed", "focused_resumed"], "Failed to request the focus: ");
-      showToast(result.text, result.succeeded);
-    } catch (err) {
-      showToast(`Failed to request the focus: ${err}`, false);
-    }
-  });
-
   // Clicking a mo button opens the task's documents in mo, in the one tab this page keeps
   // for mo: the tab is found by its name, so every task replaces the page in the same tab.
   // The tab is taken before the request, while the click still allows opening a window, and
@@ -540,27 +512,44 @@ const postJSON = (path, body) => fetch(path, {
 })();
 
 (() => {
-  // Clicking a start button starts a new Claude Code session for the task in a new herdr
-  // tab, rather than focusing a session it already has, such as the session it was created
-  // in. The button can't be clicked again until the result comes back, so that a double
-  // click doesn't open two tabs.
+  // Clicking a new button starts a new Claude Code session for the task in a new herdr tab,
+  // rather than opening a session it already has, such as the session it was created in.
+  // Clicking an open button focuses the herdr pane of the task's Claude Code session, resumes
+  // the session in a new tab when it has no pane, or starts a new session when the task has
+  // none. A button can't be clicked again until the result comes back, so that a double
+  // click doesn't open two tabs. A tab already reviewing the pull request isn't a success,
+  // as with the form.
+  const sessionButtons = [
+    { selector: ".new-button", path: "/new", label: "new", pending: "Starting...", success: ["started"] },
+    {
+      selector: ".open-button",
+      path: "/open",
+      label: "open",
+      pending: "Opening...",
+      success: ["focused", "resumed", "resumed_fallback", "focused_resumed", "started"],
+    },
+  ];
   document.querySelector("tbody").addEventListener("click", async (e) => {
-    const button = e.target.closest(".start-button");
-    if (!button || button.disabled) {
+    const kind = sessionButtons.find((b) => e.target.closest(b.selector));
+    if (!kind) {
+      return;
+    }
+    const button = e.target.closest(kind.selector);
+    if (button.disabled) {
       return;
     }
     const tr = button.closest("tr");
     button.disabled = true;
-    button.textContent = "Starting...";
+    button.textContent = kind.pending;
     try {
-      const res = await postJSON("/start", { task: tr.dataset.dir ?? "" });
-      const result = await readResult(res, "started", "Failed to request: ");
+      const res = await postJSON(kind.path, { task: tr.dataset.dir ?? "" });
+      const result = await readResult(res, kind.success, "Failed to request: ");
       showToast(result.text, result.succeeded);
     } catch (err) {
       showToast(`Failed to request: ${err}`, false);
     } finally {
       button.disabled = false;
-      button.textContent = "start";
+      button.textContent = kind.label;
     }
   });
 })();

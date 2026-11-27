@@ -73,7 +73,7 @@ func postFocusTask(t *testing.T, h http.Handler, task string) focusResult {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec := postFocus(t, h, string(body), "application/json", "http://127.0.0.1:8080")
+	rec := postOpen(t, h, string(body), "application/json", "http://127.0.0.1:8080")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
