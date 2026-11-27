@@ -1,5 +1,5 @@
 name: # task id
-description:
+description: # the same text as the short description at the top of <task id>.md
 type: implementation # implementation, investigation
 status: todo # backlog, todo, overview-design, detail-design, doing, in-review, pending, cancel, done
 tags: []
