@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/suzuki-shunsuke/cobra-util/cobrautil"
+	"github.com/suzuki-shunsuke/saki/pkg/claudesession"
 	"github.com/suzuki-shunsuke/saki/pkg/cli/flag"
 	"github.com/suzuki-shunsuke/saki/pkg/cli/skill"
 	"github.com/suzuki-shunsuke/saki/pkg/controller/serve"
@@ -48,6 +49,12 @@ task.yaml of every directory under the tasks directory of the current directory,
 to task.yaml show up on reload.
 It stops on SIGINT (Ctrl-C) or SIGTERM.
 
+Clicking a task's row focuses the herdr pane where Claude Code runs the task's session, the
+one written last in claude_sessions among those with a pane. If no session has a pane, it
+resumes the session written last (claude --resume) in a new herdr tab, in the directory the
+session was last working in. This needs herdr's Claude Code integration
+(herdr integration install claude), which tells herdr the session of each pane.
+
 The form at the top of the page starts Claude Code in a new herdr tab. Claude Code is
 told to run "saki skill show dev-flow" (or pr-review) and follow it, so saki needs to be
 in PATH there. saki serve needs to run in a herdr pane.
@@ -75,10 +82,13 @@ func run(ctx context.Context, logger *slogutil.Logger, args *Args) error {
 	if err != nil {
 		return fmt.Errorf("get the current directory: %w", err)
 	}
+	// Without a home directory, only CLAUDE_CONFIG_DIR tells where the sessions are.
+	home, _ := os.UserHomeDir()
 	return serve.Serve(ctx, logger.Logger, &serve.Param{ //nolint:wrapcheck
-		TasksDir:    task.DefaultDir,
-		Port:        args.Port,
-		HerdrPaneID: os.Getenv("HERDR_PANE_ID"),
-		Dir:         dir,
+		TasksDir:        task.DefaultDir,
+		Port:            args.Port,
+		HerdrPaneID:     os.Getenv("HERDR_PANE_ID"),
+		Dir:             dir,
+		ClaudeConfigDir: claudesession.ConfigDir(os.Getenv, home),
 	})
 }

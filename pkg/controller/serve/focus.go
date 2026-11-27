@@ -22,7 +22,8 @@ type Herdr interface {
 	Focus(ctx context.Context, paneID string) error
 	PaneWorkspace(ctx context.Context, paneID string) (string, error)
 	CreateTab(ctx context.Context, workspaceID, cwd, label string) (string, error)
-	StartAgent(ctx context.Context, name, paneID string, wait time.Duration) error
+	StartAgent(ctx context.Context, name, paneID string, wait time.Duration, args ...string) error
+	PaneAgent(ctx context.Context, paneID string) (*herdr.Agent, error)
 	Prompt(ctx context.Context, name, text string) error
 	ListTabs(ctx context.Context) ([]herdr.Tab, error)
 	FocusTab(ctx context.Context, tabID string) error
@@ -58,8 +59,10 @@ type focusResponse struct {
 }
 
 // focusTask focuses the herdr pane of the task's Claude Code session. Of the sessions with a
-// pane, the one written last in claude_sessions wins. dir is the task's directory name.
-func focusTask(ctx context.Context, logger *slog.Logger, h Herdr, tasksDir, dir string) *focusResponse {
+// pane, the one written last in claude_sessions wins. When no session has a pane, l resumes
+// the session written last in a new tab; without l, it's reported as not found. dir is the
+// task's directory name.
+func focusTask(ctx context.Context, logger *slog.Logger, h Herdr, l *Launcher, tasksDir, dir string) *focusResponse {
 	t := findTask(tasksDir, dir)
 	if t == nil {
 		return &focusResponse{Result: focusUnknownTask, Message: dir + " isn't found"}
@@ -79,12 +82,27 @@ func focusTask(ctx context.Context, logger *slog.Logger, h Herdr, tasksDir, dir 
 	}
 	paneID := findPane(agents, sessions)
 	if paneID == "" {
-		return &focusResponse{Result: focusNotFound, Message: "No herdr pane for the sessions of " + dir}
+		return resumeTask(ctx, logger, l, t, sessions[len(sessions)-1])
 	}
 	if err := h.Focus(ctx, paneID); err != nil {
 		return herdrFailure(logger, err)
 	}
 	return &focusResponse{Result: focusFocused, Message: "Focused the pane of " + dir}
+}
+
+// resumeTask resumes the session of the task t with l, or reports that no pane was found
+// without l.
+func resumeTask(ctx context.Context, logger *slog.Logger, l *Launcher, t *task.Task, session string) *focusResponse {
+	if l == nil {
+		return &focusResponse{Result: focusNotFound, Message: "No herdr pane for the sessions of " + t.Dir}
+	}
+	// As with a launch, resuming goes on even if the browser goes away, because stopping
+	// halfway would leave a tab without Claude Code.
+	res := l.resume(context.WithoutCancel(ctx), logger, t, session)
+	if res.Result != launchError {
+		logger.Info("resume the Claude Code session of the task", "task", t.Dir, "result", res.Result, "message", res.Message)
+	}
+	return res
 }
 
 // findTask returns the task in the directory dir, or nil. dir is only compared with the
@@ -131,12 +149,12 @@ func herdrFailure(logger *slog.Logger, err error) *focusResponse {
 }
 
 // serveFocus handles POST /focus.
-func serveFocus(w http.ResponseWriter, r *http.Request, logger *slog.Logger, h Herdr, tasksDir string) {
+func serveFocus(w http.ResponseWriter, r *http.Request, logger *slog.Logger, h Herdr, l *Launcher, tasksDir string) {
 	dir, ok := readTaskRequest(w, r, logger)
 	if !ok {
 		return
 	}
-	writeJSON(w, logger, http.StatusOK, focusTask(r.Context(), logger, h, tasksDir, dir))
+	writeJSON(w, logger, http.StatusOK, focusTask(r.Context(), logger, h, l, tasksDir, dir))
 }
 
 // readTaskRequest reads the task directory name of a request from the page, such as a focus

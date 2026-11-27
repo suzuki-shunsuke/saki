@@ -22,7 +22,7 @@ import (
 )
 
 // agentNamePattern is the rule of herdr's agent names, with the name saki gives.
-var agentNamePattern = regexp.MustCompile(`^(?:task|review|session)-[0-9]{8}-[0-9]{6}-[a-z2-7]{4}$`)
+var agentNamePattern = regexp.MustCompile(`^(?:task|review|session|resume)-[0-9]{8}-[0-9]{6}-[a-z2-7]{4}$`)
 
 // The prompts are spelled out rather than taken from the package, so that the test pins
 // the text the specification gives.

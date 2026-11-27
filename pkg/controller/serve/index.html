@@ -424,13 +424,14 @@ const showToast = (text, succeeded) => {
 };
 
 // readResult returns the message for the server's response, its result, and whether the
-// result is success. A response which isn't a 200 with a JSON message is a failed request.
+// result is success: success is the result of success, or an array of them. A response
+// which isn't a 200 with a JSON message is a failed request.
 const readResult = async (res, success, failurePrefix) => {
   if (res.ok) {
     try {
       const body = await res.json();
       if (typeof body.message === "string") {
-        return { text: body.message, result: body.result, succeeded: body.result === success };
+        return { text: body.message, result: body.result, succeeded: [success].flat().includes(body.result) };
       }
     } catch {
       // Not JSON: fall through to the HTTP status.
@@ -446,8 +447,8 @@ const postJSON = (path, body) => fetch(path, {
 });
 
 (() => {
-  // Clicking a row asks the server to focus the herdr pane of the task's Claude Code session.
-  // A click on a link only opens the link, a click on a button does what the button does,
+  // Clicking a row asks the server to focus the herdr pane of the task's Claude Code session,
+  // or to resume the session in a new tab when it has no pane. A click on a link only opens the link, a click on a button does what the button does,
   // and selecting text doesn't ask.
   document.querySelector("tbody").addEventListener("click", async (e) => {
     if (e.target.closest("a, button")) {
@@ -462,7 +463,9 @@ const postJSON = (path, body) => fetch(path, {
     }
     try {
       const res = await postJSON("/focus", { task: tr.dataset.dir ?? "" });
-      const result = await readResult(res, "focused", "Failed to request the focus: ");
+      // A tab already reviewing the pull request isn't a success, as with the form and the
+      // start button.
+      const result = await readResult(res, ["focused", "resumed", "focused_resumed"], "Failed to request the focus: ");
       showToast(result.text, result.succeeded);
     } catch (err) {
       showToast(`Failed to request the focus: ${err}`, false);
