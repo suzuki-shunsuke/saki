@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"io"
 	"log/slog"
 	"strings"
 	"testing"
@@ -19,7 +20,8 @@ const program = "saki"
 
 // received records the flag values each command's action was called with.
 type received struct {
-	Serve *serve.Args
+	Serve    *serve.Args
+	Assignee bool
 }
 
 // execute runs the real command tree with args and env, with the actions replaced
@@ -30,6 +32,10 @@ func execute(t *testing.T, args []string, env map[string]string) (*received, str
 	acts := &actions{
 		serve: func(_ context.Context, a *serve.Args) error {
 			got.Serve = a
+			return nil
+		},
+		assignee: func(_ context.Context, _ io.Writer) error {
+			got.Assignee = true
 			return nil
 		},
 	}
@@ -101,6 +107,11 @@ func TestNewCommand_flags(t *testing.T) { //nolint:funlen
 			}},
 		},
 		{
+			name: "assignee",
+			args: []string{"assignee"},
+			exp:  &received{Assignee: true},
+		},
+		{
 			name: "global flags before the subcommand",
 			args: []string{"--log-level", "error", "serve"},
 			exp: &received{Serve: &serve.Args{
@@ -142,6 +153,7 @@ func TestNewCommand_errors(t *testing.T) {
 		{name: "invalid value", args: []string{"serve", "--port", "abc"}},
 		{name: "invalid environment variable", args: []string{"serve"}, env: map[string]string{"SAKI_PORT": "abc"}},
 		{name: "h alias", args: []string{"h", "serve"}},
+		{name: "assignee with an argument", args: []string{"assignee", "foo"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -184,7 +196,7 @@ func TestNewCommand_version(t *testing.T) {
 
 func TestNewCommand_help(t *testing.T) {
 	t.Parallel()
-	for _, args := range [][]string{nil, {"--help"}, {"help", "serve"}, {"serve", "-h"}} {
+	for _, args := range [][]string{nil, {"--help"}, {"help", "serve"}, {"serve", "-h"}, {"assignee", "--help"}} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			t.Parallel()
 			got, out, err := execute(t, args, nil)

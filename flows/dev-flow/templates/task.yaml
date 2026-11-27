@@ -3,6 +3,7 @@ description:
 type: implementation # implementation, investigation
 status: todo # backlog, todo, overview-design, detail-design, doing, in-review, pending, cancel, done
 tags: []
+assignees: [] # GitHub logins of the people in charge of the task. The agent sets the output of "saki assignee" when it creates the task
 claude_sessions: [] # - id: <session id>, description: <summary of the session and how it relates to the task>
 parent_task: ""
 sub_tasks: []

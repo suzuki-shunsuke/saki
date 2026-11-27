@@ -3,6 +3,7 @@ description: # Review <owner>/<repo>#<pr number>: <pull request title>
 type: pr-review
 status: doing # doing, in-review, pending, cancel, done
 tags: []
+assignees: [] # GitHub logins of the people in charge of the review. The agent sets the output of "saki assignee" when it creates the review
 claude_sessions: [] # - id: <session id>, description: <summary of the session and how it relates to the review>
 parent_task: ""
 sub_tasks: []

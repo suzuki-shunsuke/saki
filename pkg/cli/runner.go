@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/suzuki-shunsuke/cobra-util/cobrautil"
+	"github.com/suzuki-shunsuke/saki/pkg/cli/assignee"
 	"github.com/suzuki-shunsuke/saki/pkg/cli/flag"
 	"github.com/suzuki-shunsuke/saki/pkg/cli/serve"
 	"github.com/suzuki-shunsuke/saki/pkg/cli/skill"
@@ -29,7 +30,8 @@ func Run(ctx context.Context, logger *slogutil.Logger, env *cobrautil.Env) error
 // exists so that a test can run the real command tree, with its global flags and
 // environment variables, and check the values the commands receive.
 type actions struct {
-	serve serve.Action
+	serve    serve.Action
+	assignee assignee.Action
 }
 
 // newCommand builds the command tree. It is separate from Run so that a test can
@@ -46,6 +48,7 @@ See https://github.com/suzuki-shunsuke/saki for details.`,
 	cmd.AddCommand(
 		serve.New(logger, gFlags, acts.serve),
 		skill.New(),
+		assignee.New(env.Getenv, acts.assignee),
 	)
 	return cobrautil.Command(env, cmd, nil)
 }

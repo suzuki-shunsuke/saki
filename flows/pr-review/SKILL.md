@@ -67,11 +67,14 @@ Create task.yaml from `saki skill show pr-review templates/task.yaml` right afte
 | `type` | `pr-review` |
 | `status` | see below |
 | `tags` | may be empty (the human may add tags) |
+| `assignees` | the one login `saki assignee` prints (see below) |
 | `claude_sessions` | the sessions that worked on the review |
 | `repositories` | `https://github.com/<owner>/<repo>` |
 | `issues` | the URLs of the issues the pull request closes (`closingIssuesReferences`), or empty |
 | `pull_requests` | `https://github.com/<owner>/<repo>/pull/<pr number>` |
 | `parent_task`, `sub_tasks`, `derived_from`, `derived_tasks` | empty |
+
+Run `saki assignee` when creating task.yaml, and set `assignees` to a list of the one login it prints. This tells whose review a review is when tasks/ is shared with git. If it fails, leave `assignees` empty (`[]`), tell the human in a sentence with its error, and continue. Don't retry. Don't change `assignees` afterwards, even when you resume a review created by someone else, and don't add it to a task.yaml that has none. The human edits it to add or change the people in charge.
 
 Every session that works on the review appends its ID (the environment variable `CLAUDE_CODE_SESSION_ID`) and a summary of the session to the end of `claude_sessions`, when it creates task.yaml or when it resumes the review. Skip it if the session is already listed. This lets a click on the review's row in `saki serve` focus the session's pane.
 
