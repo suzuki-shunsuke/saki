@@ -29,7 +29,7 @@ type Herdr interface {
 	FocusTab(ctx context.Context, tabID string) error
 }
 
-// The results of a focus request.
+// The results of an open request, besides those of resuming a session and starting a new one.
 const (
 	focusFocused     = "focused"
 	focusNoSession   = "no_session"
@@ -48,7 +48,7 @@ const resultBadRequest = "bad_request"
 // maxTaskRequestSize limits the body of a request from the page, which only holds a task name.
 const maxTaskRequestSize = 1 << 16
 
-// taskRequest is the body of a request from the page about a task, such as a focus request.
+// taskRequest is the body of a request from the page about a task, such as an open request.
 type taskRequest struct {
 	Task string `json:"task"`
 }
@@ -58,11 +58,13 @@ type focusResponse struct {
 	Message string `json:"message"`
 }
 
-// focusTask focuses the herdr pane of the task's Claude Code session. Of the sessions with a
-// pane, the one written last in claude_sessions wins. When no session has a pane, l resumes
-// the session written last in a new tab; without l, it's reported as not found. dir is the
-// task's directory name.
-func focusTask(ctx context.Context, logger *slog.Logger, h Herdr, l *Launcher, tasksDir, dir string) *focusResponse {
+// openTask opens the task's Claude Code session, when its open button is clicked. It focuses
+// the herdr pane of the session: of the sessions with a pane, the one written last in
+// claude_sessions wins. When no session has a pane, l resumes the session written last in a
+// new tab; without l, it's reported as not found. When the task has no session, l starts a
+// new one as the new button does; without l, it's reported as no session. dir is the task's
+// directory name.
+func openTask(ctx context.Context, logger *slog.Logger, h Herdr, l *Launcher, tasksDir, dir string) *focusResponse {
 	t := findTask(tasksDir, dir)
 	if t == nil {
 		return &focusResponse{Result: focusUnknownTask, Message: dir + " isn't found"}
@@ -74,7 +76,10 @@ func focusTask(ctx context.Context, logger *slog.Logger, h Herdr, l *Launcher, t
 		}
 	}
 	if len(sessions) == 0 {
-		return &focusResponse{Result: focusNoSession, Message: dir + " has no Claude Code session"}
+		if l == nil {
+			return &focusResponse{Result: focusNoSession, Message: dir + " has no Claude Code session"}
+		}
+		return l.startSession(ctx, logger, tasksDir, t)
 	}
 	agents, err := h.ListAgents(ctx)
 	if err != nil {
@@ -148,16 +153,16 @@ func herdrFailure(logger *slog.Logger, err error) *focusResponse {
 	return &focusResponse{Result: focusError, Message: "Failed to focus the pane: " + err.Error()}
 }
 
-// serveFocus handles POST /focus.
-func serveFocus(w http.ResponseWriter, r *http.Request, logger *slog.Logger, h Herdr, l *Launcher, tasksDir string) {
+// serveOpen handles POST /open.
+func serveOpen(w http.ResponseWriter, r *http.Request, logger *slog.Logger, h Herdr, l *Launcher, tasksDir string) {
 	dir, ok := readTaskRequest(w, r, logger)
 	if !ok {
 		return
 	}
-	writeJSON(w, logger, http.StatusOK, focusTask(r.Context(), logger, h, l, tasksDir, dir))
+	writeJSON(w, logger, http.StatusOK, openTask(r.Context(), logger, h, l, tasksDir, dir))
 }
 
-// readTaskRequest reads the task directory name of a request from the page, such as a focus
+// readTaskRequest reads the task directory name of a request from the page, such as an open
 // request. It rejects a request from another site with 403 and an invalid body with 400,
 // and returns false then.
 func readTaskRequest(w http.ResponseWriter, r *http.Request, logger *slog.Logger) (string, bool) {

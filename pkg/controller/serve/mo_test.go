@@ -278,14 +278,17 @@ func TestHandlerMoButton(t *testing.T) {
 	writeTask(t, dir, "foo", "name: foo\n")
 	h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, nil, nil, nil)
 	body := getIndex(h).Body.String()
-	want := `<td data-col="name"><button type="button" class="mo-button" title="Open the documents in mo">mo</button><button type="button" class="start-button" title="Start a new Claude Code session for this task in a new herdr tab">start</button><div>foo</div></td>`
+	want := `<td data-col="name"><button type="button" class="mo-button" title="Open the documents in mo">mo</button><button type="button" class="new-button" title="Start a new Claude Code session for this task in a new herdr tab">new</button><button type="button" class="open-button" title="Open the Claude Code session of this task: focus its herdr pane, resume it in a new herdr tab if it has no pane, or start a new session if the task has none">open</button><div>foo</div></td>`
 	if !strings.Contains(body, want) {
-		t.Errorf("the page doesn't have the mo button in the name cell %q", want)
+		t.Errorf("the page doesn't have the buttons in the name cell %q", want)
 	}
 	if got := strings.Count(body, `class="mo-button"`); got != 1 {
 		t.Errorf("the page has %d mo buttons, want 1", got)
 	}
-	if got := strings.Count(body, `class="start-button"`); got != 1 {
-		t.Errorf("the page has %d start buttons, want 1", got)
+	if got := strings.Count(body, `class="new-button"`); got != 1 {
+		t.Errorf("the page has %d new buttons, want 1", got)
+	}
+	if got := strings.Count(body, `class="open-button"`); got != 1 {
+		t.Errorf("the page has %d open buttons, want 1", got)
 	}
 }

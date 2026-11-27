@@ -514,8 +514,8 @@ func TestLaunchContinuesAfterDisconnect(t *testing.T) {
 	}
 }
 
-// startTasksDir has the task "one", whose session is the one it was created in.
-func startTasksDir(t *testing.T) string {
+// newTasksDir has the task "one", whose session is the one it was created in.
+func newTasksDir(t *testing.T) string {
 	t.Helper()
 	dir := emptyTasksDir(t)
 	writeTask(t, dir, "one", "name: one\nclaude_sessions:\n  - id: s1\n")
@@ -523,13 +523,13 @@ func startTasksDir(t *testing.T) string {
 	return dir
 }
 
-func postStart(t *testing.T, h http.Handler, task string) focusResult {
+func postNew(t *testing.T, h http.Handler, task string) focusResult {
 	t.Helper()
 	body, err := json.Marshal(map[string]string{"task": task})
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec := postFocusPath(t, h, "/start", string(body), "application/json", "http://127.0.0.1:8080")
+	rec := postFocusPath(t, h, "/new", string(body), "application/json", "http://127.0.0.1:8080")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
@@ -540,7 +540,7 @@ func postStart(t *testing.T, h http.Handler, task string) focusResult {
 	return got
 }
 
-func TestStart(t *testing.T) {
+func TestNew(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name string
@@ -554,13 +554,13 @@ func TestStart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			dir := startTasksDir(t)
+			dir := newTasksDir(t)
 			f := &fakeHerdr{
 				agents:    []herdr.Agent{{PaneID: "w1:p5", Kind: "claude", SessionID: "s1"}},
 				startErrs: []error{busy()},
 			}
 			h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, f, nil, newLauncher(f))
-			got := postStart(t, h, tt.task)
+			got := postNew(t, h, tt.task)
 			want := focusResult{Result: "started", Message: "Started a new Claude Code session for " + tt.task + " in a new tab"}
 			if diff := cmp.Diff(want, got); diff != "" {
 				t.Errorf("response (-want +got):\n%s", diff)
@@ -591,7 +591,7 @@ func TestStart(t *testing.T) {
 	}
 }
 
-func TestStartNotStarted(t *testing.T) {
+func TestNewNotStarted(t *testing.T) {
 	t.Parallel()
 	notRunning := &herdr.Error{Code: herdr.CodeServerNotRunning, Message: "not running"}
 	tests := []struct {
@@ -620,8 +620,8 @@ func TestStartNotStarted(t *testing.T) {
 			if tt.paneID == "-" {
 				l.PaneID = ""
 			}
-			h := serve.NewHandler(slog.New(slog.DiscardHandler), startTasksDir(t), nil, tt.herdr, nil, l)
-			got := postStart(t, h, tt.task)
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), newTasksDir(t), nil, tt.herdr, nil, l)
+			got := postNew(t, h, tt.task)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("response (-want +got):\n%s", diff)
 			}
@@ -632,7 +632,7 @@ func TestStartNotStarted(t *testing.T) {
 	}
 }
 
-func TestStartRejected(t *testing.T) {
+func TestNewRejected(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name        string
@@ -650,8 +650,8 @@ func TestStartRejected(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			f := &fakeHerdr{}
-			h := serve.NewHandler(slog.New(slog.DiscardHandler), startTasksDir(t), nil, f, nil, newLauncher(f))
-			rec := postFocusPath(t, h, "/start", tt.body, tt.contentType, tt.origin)
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), newTasksDir(t), nil, f, nil, newLauncher(f))
+			rec := postFocusPath(t, h, "/new", tt.body, tt.contentType, tt.origin)
 			if rec.Code != tt.want {
 				t.Errorf("status = %d, want %d", rec.Code, tt.want)
 			}
@@ -662,9 +662,9 @@ func TestStartRejected(t *testing.T) {
 	}
 }
 
-// TestStartReview starts a session for a review of pr-review: its tab has the label of the
+// TestNewReview starts a session for a review of pr-review: its tab has the label of the
 // form's review, so a tab already reviewing the pull request is focused instead.
-func TestStartReview(t *testing.T) {
+func TestNewReview(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name string
@@ -682,7 +682,7 @@ func TestStartReview(t *testing.T) {
 			writeTask(t, dir, "review_aquaproj_aqua_1234", "name: review_aquaproj_aqua_1234\ntype: pr-review\npull_requests:\n  - https://github.com/aquaproj/aqua/pull/1234\n")
 			f := &fakeHerdr{tabs: tt.tabs, startErrs: []error{busy()}}
 			h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, f, nil, newLauncher(f))
-			got := postStart(t, h, "review_aquaproj_aqua_1234")
+			got := postNew(t, h, "review_aquaproj_aqua_1234")
 			if tt.focus != "" {
 				want := focusResult{Result: "focused_existing", Message: "A tab is already reviewing AquaProj/Aqua#1234: focused it"}
 				if diff := cmp.Diff(want, got); diff != "" {

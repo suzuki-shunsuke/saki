@@ -35,7 +35,7 @@ Work on each task in its own herdr pane.
 ### Naming the herdr Tab
 
 `saki serve` creates the tab of a task started from its new task form with the label `new task`, because the task id isn't decided yet.
-Once the task id is decided, rename that tab to `task <task id>`, the same label `saki serve` gives the tab of a session started from a task's row, so that the tabs of tasks running in parallel can be told apart.
+Once the task id is decided, rename that tab to `task <task id>`, the same label `saki serve` gives the tab of a session started with a task's new or open button, so that the tabs of tasks running in parallel can be told apart.
 
 - Only an agent whose prompt contains "This pane is dedicated to this task. Don't open another pane." does this. An agent that opens another pane for the task leaves its own tab alone
 - Do it once, when the id of the task this session works on is decided: after the human confirms the task id of a new task (before creating `tasks/<task id>/`), or when you find the task to resume in tasks/

@@ -197,8 +197,8 @@ func reviewJob(text string) (*launchJob, *focusResponse) {
 
 // sessionJob returns the job to start a new Claude Code session for the task t of tasksDir,
 // so that the task is worked on in its own session rather than in the session it was
-// created in. The session adds its own ID to claude_sessions, so that clicking the task's
-// row focuses it afterwards. A review of pr-review is resumed with pr-review (see
+// created in. The session adds its own ID to claude_sessions, so that the task's open
+// button focuses it afterwards. A review of pr-review is resumed with pr-review (see
 // reviewSessionJob).
 func sessionJob(tasksDir string, t *task.Task) *launchJob {
 	taskDir := filepath.ToSlash(filepath.Join(tasksDir, t.Dir))
@@ -218,7 +218,7 @@ func sessionJob(tasksDir string, t *task.Task) *launchJob {
 // reviewSessionJob returns the job to resume the review t in taskDir with pr-review in a
 // new session. With the URL of a pull request in pull_requests, the first one, its tab has
 // the label of a tab started from the form to review the pull request, and a tab already
-// reviewing it is focused instead, so that the form and the start button don't start two
+// reviewing it is focused instead, so that the form and the new button don't start two
 // sessions for one review. The URL is built from its parts, as the form does.
 func reviewSessionJob(taskDir string, t *task.Task) *launchJob {
 	label, reuse, prURL := sessionTab(t)
@@ -239,7 +239,7 @@ func reviewSessionJob(taskDir string, t *task.Task) *launchJob {
 // sessionTab returns the label of the tab of a session for the task t, and whether a tab
 // already labeled so is focused instead of creating another one. A review of pr-review with
 // the URL of a pull request in pull_requests, the first one, has the label of a tab started
-// from the form to review the pull request, so that the form, the start button, and resuming
+// from the form to review the pull request, so that the form, the new button, and the open button
 // don't start two sessions for one review; the URL, built from its parts, is returned too.
 func sessionTab(t *task.Task) (string, bool, string) {
 	if t.Type == task.TypePRReview {
@@ -474,9 +474,9 @@ func serveLaunch(w http.ResponseWriter, r *http.Request, logger *slog.Logger, l 
 	writeJSON(w, logger, http.StatusOK, res)
 }
 
-// serveStart handles POST /start, which starts a new Claude Code session for a task in a
-// new herdr tab.
-func serveStart(w http.ResponseWriter, r *http.Request, logger *slog.Logger, l *Launcher, tasksDir string) {
+// serveNew handles POST /new, which starts a new Claude Code session for a task in a new
+// herdr tab.
+func serveNew(w http.ResponseWriter, r *http.Request, logger *slog.Logger, l *Launcher, tasksDir string) {
 	dir, ok := readTaskRequest(w, r, logger)
 	if !ok {
 		return
@@ -485,11 +485,18 @@ func serveStart(w http.ResponseWriter, r *http.Request, logger *slog.Logger, l *
 	if t := findTask(tasksDir, dir); t == nil {
 		res = &focusResponse{Result: focusUnknownTask, Message: dir + " isn't found"}
 	} else {
-		// As with serveLaunch, starting goes on even if the browser goes away.
-		res = l.launch(context.WithoutCancel(r.Context()), logger, sessionJob(tasksDir, t))
-	}
-	if res.Result != launchError {
-		logger.Info("start a new Claude Code session for the task in a new herdr tab", "task", dir, "result", res.Result, "message", res.Message)
+		res = l.startSession(r.Context(), logger, tasksDir, t)
 	}
 	writeJSON(w, logger, http.StatusOK, res)
+}
+
+// startSession starts a new Claude Code session for the task t in a new herdr tab, when its
+// new button is clicked, or its open button is clicked and it has no session yet.
+func (l *Launcher) startSession(ctx context.Context, logger *slog.Logger, tasksDir string, t *task.Task) *focusResponse {
+	// As with serveLaunch, starting goes on even if the browser goes away.
+	res := l.launch(context.WithoutCancel(ctx), logger, sessionJob(tasksDir, t))
+	if res.Result != launchError {
+		logger.Info("start a new Claude Code session for the task in a new herdr tab", "task", t.Dir, "result", res.Result, "message", res.Message)
+	}
+	return res
 }

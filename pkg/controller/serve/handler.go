@@ -41,7 +41,7 @@ type cell struct {
 // row is a row of the task list. The fields other than Cells are what the search box
 // matches. Tags, Repos, Issues, and PRs are values separated by newlines.
 type row struct {
-	// Dir is the task's directory name, which a click on the row sends to focus its pane.
+	// Dir is the task's directory name, which the row's buttons send to the server.
 	Dir         string
 	Name        string
 	Description string
@@ -171,11 +171,11 @@ func claudeSessions(t *task.Task) []item {
 // NewHandler returns the handler serving the list of the tasks.
 // It reads the tasks of tasksDir on every request, so changes to task.yaml show up on
 // reload. initialFailures are the failures of the read at startup, which NewHandler warns
-// about so that the first request doesn't repeat the warnings. h focuses the herdr pane of
-// a task's session when its row is clicked, and l resumes the session in a new tab when no
-// pane is found, m opens a task's documents in mo when its mo
-// button is clicked, and l starts Claude Code in a new tab to create a task, or to start a new
-// session for a task when its start button is clicked.
+// about so that the first request doesn't repeat the warnings. When a task's open
+// button is clicked, h focuses the herdr pane of the task's session, l resumes the session in
+// a new tab when no pane is found, and l starts a new session when the task has none. m opens
+// a task's documents in mo when its mo button is clicked, and l starts Claude Code in a new
+// tab to create a task, or to start a new session for a task when its new button is clicked.
 func NewHandler(logger *slog.Logger, tasksDir string, initialFailures []*task.Failure, h Herdr, m Mo, l *Launcher) http.Handler {
 	reporter := newFailureReporter(logger, initialFailures)
 	mux := http.NewServeMux()
@@ -190,8 +190,8 @@ func NewHandler(logger *slog.Logger, tasksDir string, initialFailures []*task.Fa
 		}
 		serveIndex(w, logger, result.Tasks)
 	})
-	mux.HandleFunc("POST /focus", func(w http.ResponseWriter, r *http.Request) {
-		serveFocus(w, r, logger, h, l, tasksDir)
+	mux.HandleFunc("POST /open", func(w http.ResponseWriter, r *http.Request) {
+		serveOpen(w, r, logger, h, l, tasksDir)
 	})
 	mux.HandleFunc("POST /mo", func(w http.ResponseWriter, r *http.Request) {
 		serveMo(w, r, logger, m, tasksDir)
@@ -199,8 +199,8 @@ func NewHandler(logger *slog.Logger, tasksDir string, initialFailures []*task.Fa
 	mux.HandleFunc("POST /launch", func(w http.ResponseWriter, r *http.Request) {
 		serveLaunch(w, r, logger, l)
 	})
-	mux.HandleFunc("POST /start", func(w http.ResponseWriter, r *http.Request) {
-		serveStart(w, r, logger, l, tasksDir)
+	mux.HandleFunc("POST /new", func(w http.ResponseWriter, r *http.Request) {
+		serveNew(w, r, logger, l, tasksDir)
 	})
 	return checkHost(mux)
 }
