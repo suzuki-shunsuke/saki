@@ -25,7 +25,7 @@ If a human judges it necessary and explicitly invokes the skill, start the flow 
 1. Look in tasks/ for a task corresponding to the request. Skip tasks whose `type` is `pr-review`: they are reviews of pull requests created by others, handled by the pr-review flow (`saki skill show pr-review`), not this flow
 1. If there is none, generate the task documents from the templates before writing any code, write Background / What / Why / Scope / Out of Scope, and ask the human for a review (start from step 1 of Steps). If the request is too vague to write these, ask what they want implemented
     - If what to do (What) is not yet decided and investigation or organizing information is needed to decide it, start an investigation task (see "Investigation Tasks")
-1. If there is one, determine the progress from task.yaml's `type` and `status`, which sections are filled in, and the decision log in details.md, and resume from the next step. Name the herdr tab after the task (see "Naming the herdr Tab")
+1. If there is one, determine the progress from task.yaml's `type` and `status`, the Next Action at the top of `<task id>.md`, which sections are filled in, and the decision log in details.md, and resume from the next step. Name the herdr tab after the task (see "Naming the herdr Tab")
 
 Work on each task in its own herdr pane.
 
@@ -70,6 +70,8 @@ In that case too, generate documents from the pull request and bring it into the
 1. Get the human's approval of Background / What / Why / Scope / Out of Scope and Behaviour. If the pull request contains out-of-scope changes, point them out at this time
 1. Join step 3 of Steps at the pull request review. If the code changes during review, rewrite the PR Explanation at the end
 
+Writing the documents and getting them approved are one stage, so keep `status` at `detail-design` through steps 1 and 2, and tell them apart with the Next Action (see "The Head of the Task Document").
+
 ## Document Layout
 
 ```
@@ -85,9 +87,70 @@ tasks/
 - Create documents per task. If you decide to split a task during design, split the documents too. Scope / Out of Scope is the criterion for whether to accept review comments, so if it is not split per task, judgments become inconsistent
   - When creating multiple pull requests, create documents per pull request as sub tasks, and make each pull request's scope clear. Reduce rework by settling the pull requests needed for the whole parent task and each pull request's specification before creating any pull request
 - `task.yaml`: the task's metadata, generated from `saki skill show dev-flow templates/task.yaml` (see "task.yaml")
-- `<task id>.md`: the README-equivalent document, generated from `saki skill show dev-flow templates/design.md` (`saki skill show dev-flow templates/investigation.md` for investigation tasks). Give it a unique name rather than something like README.md so it is distinguishable by file name
+- `<task id>.md`: the README-equivalent document, generated from `saki skill show dev-flow templates/design.md` (`saki skill show dev-flow templates/investigation.md` for investigation tasks). Give it a unique name rather than something like README.md so it is distinguishable by file name. It starts with a short description of the task and the Next Action (see "The Head of the Task Document")
 - `details.md`: records what was discussed with the agent during design and the decisions made in review. Keeping it as primary information matters, but it grows large, is hard for humans to get the point of, and wastes context if the agent reads it all every time, so keep it separate from `<task id>.md`
 - `pr-explanation.md`: the PR Explanation (see "PR Explanation Format"). Not created for investigation tasks
+
+### The Head of the Task Document
+
+`<task id>.md` starts with a short description of the task and the Next Action, so that opening it tells at once what the task is and what to do next.
+`status` in task.yaml alone doesn't tell whether the human or the agent is the one to act (`overview-design` and `detail-design` include waiting for approval), nor what to do next.
+
+```markdown
+# <title>
+
+<a short description of the task>
+
+## Next Action
+
+<what to do next>
+
+## Background
+...
+```
+
+#### Short Description
+
+- Write it right after the title, without a heading. Aim for 200 characters or fewer
+- Use the same text as `description` in task.yaml. When you change one, change the other to match
+
+#### Next Action
+
+- Write what to do next. Don't write who does it: approving, deciding, and merging are the human's, and everything else is the agent's, so the verb tells who
+- Usually write it in one line
+- When the human has several things to decide, list them as bullets, one line each (e.g. for two blocking Open Questions, "Decide whether X is A or B" and "Decide Y"). Leave the options and trade-offs to Open Questions
+- The wording is not fixed. Write it in the document's language (the one a local supplement sets, if any) so that it conveys what the table below says: which work comes next, and whether it is waiting for the human. The examples are only examples
+
+| Stage | `status` | What the Next Action conveys (example) |
+|-------|----------|-----------------------------------------|
+| Step 1 of Steps: writing the overview and the agent review | `overview-design` | Designing the overview ("Write the overview") |
+| Step 1 of Steps: waiting for the human's approval | `overview-design` | Approving the overview ("Approve the overview") |
+| Step 2 of Steps: writing the specification and the agent review | `detail-design` | Designing the details ("Write the detailed design") |
+| Step 2 of Steps: waiting for the human's approval | `detail-design` | Approving Behaviour ("Approve the detailed design") |
+| Step 3 of Steps: implementing, creating the pull request, the agent review, and the PR Explanation | `doing` | Implementing ("Implement") |
+| Step 4 of Steps: waiting for the human's decision | `in-review` | Deciding on and merging the pull request ("Decide on and merge the pull request"). If there are Follow-ups, also list deciding which of them become tasks ("Decide which Follow-ups become tasks") |
+| Step 1 of investigation tasks: writing the investigation's direction and the agent review | `overview-design` | Writing the investigation's direction ("Write the investigation's direction") |
+| Step 1 of investigation tasks: waiting for the human's approval | `overview-design` | Approving the investigation's direction ("Approve the investigation's direction") |
+| Step 2 of investigation tasks: investigating and the agent review | `doing` | Investigating ("Investigate") |
+| Step 3 of investigation tasks: waiting for the human's approval | `in-review` | Approving the conclusion ("Approve the conclusion") |
+| When a Pull Request Already Exists: writing the documents | `detail-design` | Writing the overview and the specification from the pull request ("Write the overview and the detailed design from the pull request") |
+| When a Pull Request Already Exists: waiting for the human's approval | `detail-design` | Approving the overview and Behaviour ("Approve the overview and the detailed design") |
+| When a Pull Request Already Exists: after the approval, joining step 3 at the pull request review | `doing` | Reviewing the pull request ("Review the pull request") |
+| A parent task split into sub tasks, while the sub tasks progress | unchanged | The sub tasks left to do ("Proceed with sub tasks X and Y") |
+| Not started yet (including drafts created from Follow-ups) | `backlog` / `todo` | Designing the overview, or writing the investigation's direction for an investigation task |
+| Stopped | `pending` | Why it stopped and what is needed to resume ("Wait for the release of X, then resume") |
+| Cancelled | `cancel` | Nothing ("None (cancelled)") |
+| Completed | `done` | Nothing ("None (done)") |
+
+- While you wait for the human's answer to a question, write the question as the Next Action regardless of the table, and keep `status` at the value of that step. This covers blocking Open Questions, changes to approved sections in step 3, changes to an investigation's direction, review comments that go back and forth, and any other question. Once answered, go back to the Next Action of the step
+- While you do short work following the human's decision, such as creating tasks from the approved Next Tasks of an investigation task or from the Follow-ups chosen in step 4, write that work ("Create the derived tasks", "Create tasks from the Follow-ups"), and keep `status` at the value of that step
+
+#### When to Update
+
+- Update the Next Action whenever what to do next changes: when you change `status` in task.yaml, when you ask the human for approval or an answer, and when the human approves or answers
+- Change the Next Action at the same time as `status`, so that the two always match the table above (except while waiting for an answer or doing short work following the human's decision, as described above)
+- Write the short description and the Next Action when you create a task. This applies to every task you create: a sub task, a task created from an investigation task or from Follow-ups, and a task split off during design
+- Leave existing documents without them as they are
 
 ### task.yaml
 
@@ -95,7 +158,7 @@ Write the task's metadata in `tasks/<task id>/task.yaml`. This lets tools (such 
 
 ```yaml
 name: aws-provider-v6 # same as the task id
-description: Update the Terraform AWS Provider to v6
+description: Update the Terraform AWS Provider to v6 # the same text as the short description at the top of <task id>.md
 # implementation - a task that implements and creates a pull request
 # investigation - a task that investigates and organizes information to decide what to do (see "Investigation Tasks")
 # pr-review - a review of a pull request created by someone else. It is created and handled by the pr-review flow (`saki skill show pr-review`), not this flow
@@ -132,7 +195,7 @@ pull_requests:
 - When you create a task.yaml, run `saki assignee` and set `assignees` to a list of the one login it prints. This tells whose task a task is when tasks/ is shared with git. It applies to every task you create: a new task, a sub task, an investigation task, a task created from an investigation task or from Follow-ups, a task split off during design, and a task for a pull request that already exists
     - If `saki assignee` fails, leave `assignees` empty (`[]`), tell the human in a sentence with its error, and continue. Don't retry
     - Don't change `assignees` after creating the task, even when you resume a task created by someone else, and don't add it to a task.yaml that has none. The human edits it to add or change the people in charge
-- Update `status` as the steps progress (on entering each step, set the corresponding value above, and set `done` when the pull request is merged). While waiting for human approval, do not set `pending`; keep the value of that step
+- Update `status` as the steps progress (on entering each step, set the corresponding value above, and set `done` when the pull request is merged). While waiting for human approval, do not set `pending`; keep the value of that step. Update the Next Action at the top of `<task id>.md` at the same time (see "The Head of the Task Document")
 - When you create a pull request or issue, add it to `pull_requests` / `issues`
 - When you create a sub task, set both the parent's `sub_tasks` and the child's `parent_task`
 - When you create a task from an investigation task, set both the investigation task's `derived_tasks` and the new task's `derived_from`. Distinguish these from sub tasks (one task split per pull request)
