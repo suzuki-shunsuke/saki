@@ -112,6 +112,8 @@ type: implementation
 status: doing # backlog, todo, overview-design, detail-design, doing, in-review, pending, cancel, done
 tags:
   - terraform
+assignees: # GitHub logins of the people in charge of the task
+  - octocat
 claude_sessions:
   - id: xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
     description: Summary of the session and how it relates to the task
@@ -127,6 +129,9 @@ pull_requests:
   - https://github.com/aquaproj/aqua-registry/pull/64947
 ```
 
+- When you create a task.yaml, run `saki assignee` and set `assignees` to a list of the one login it prints. This tells whose task a task is when tasks/ is shared with git. It applies to every task you create: a new task, a sub task, an investigation task, a task created from an investigation task or from Follow-ups, a task split off during design, and a task for a pull request that already exists
+    - If `saki assignee` fails, leave `assignees` empty (`[]`), tell the human in a sentence with its error, and continue. Don't retry
+    - Don't change `assignees` after creating the task, even when you resume a task created by someone else, and don't add it to a task.yaml that has none. The human edits it to add or change the people in charge
 - Update `status` as the steps progress (on entering each step, set the corresponding value above, and set `done` when the pull request is merged). While waiting for human approval, do not set `pending`; keep the value of that step
 - When you create a pull request or issue, add it to `pull_requests` / `issues`
 - When you create a sub task, set both the parent's `sub_tasks` and the child's `parent_task`

@@ -10,13 +10,13 @@ import (
 
 // PermissionHelp tells how to let Claude Code run `saki skill show` without asking
 // each time. It is shared with the help of the serve command.
-const PermissionHelp = `Claude Code asks for approval each time it runs "saki skill show" unless the
-command is allowed. To allow it, add "Bash(saki skill show:*)" to permissions.allow
-in the settings of Claude Code (e.g. ~/.claude/settings.json):
+const PermissionHelp = `Claude Code asks for approval each time it runs "saki skill show", and
+"saki assignee" when it creates a task, unless the commands are allowed. To allow them,
+add them to permissions.allow in the settings of Claude Code (e.g. ~/.claude/settings.json):
 
   {
     "permissions": {
-      "allow": ["Bash(saki skill show:*)"]
+      "allow": ["Bash(saki skill show:*)", "Bash(saki assignee)"]
     }
   }`
 
