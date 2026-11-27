@@ -392,3 +392,65 @@ func checkResumedAgain(t *testing.T, f *fakeHerdr, got focusResult) {
 		t.Errorf("focused = %v, want none", f.focused)
 	}
 }
+
+func TestResumeKeepsResumedPaneOnHerdrFailure(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		set      func(f *fakeHerdr)
+		want     focusResult
+		wantCall []string
+	}{
+		{
+			name: "pane get times out",
+			set:  func(f *fakeHerdr) { f.paneAgentErr = errors.New("signal: killed") },
+			want: focusResult{Result: "error", Message: "Failed to resume the session: signal: killed"},
+		},
+		{
+			name: "herdr not running",
+			set: func(f *fakeHerdr) {
+				f.paneAgentErr = &herdr.Error{Code: herdr.CodeServerNotRunning, Message: "not running"}
+			},
+			want: focusResult{Result: "unavailable", Message: "herdr isn't running"},
+		},
+		{
+			name: "focus fails",
+			set: func(f *fakeHerdr) {
+				f.paneAgents = map[string]*herdr.Agent{"w1:p9": {PaneID: "w1:p9", Kind: "claude"}}
+				f.focusErr = errors.New("focus failed")
+			},
+			want: focusResult{Result: "error", Message: "Failed to resume the session: focus failed"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := &fakeHerdr{agents: noPaneAgents(), startErrs: []error{&herdr.Error{Code: herdr.CodeAgentNotReady, Message: "blocked"}}}
+			l := newResumeLauncher(t, f, "/work/first", "/work/last")
+			h := newResumeHandler(t, f, l)
+			if got := postFocusTask(t, h, "one"); got.Result != "blocked" {
+				t.Fatalf("first click = %+v, want blocked", got)
+			}
+			f.mu.Lock()
+			tt.set(f)
+			f.calls = nil
+			f.mu.Unlock()
+			got := postFocusTask(t, h, "one")
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("response (-want +got):\n%s", diff)
+			}
+			// No tab is created, and the pane is still remembered once herdr is back.
+			if diff := cmp.Diff([]string{"pane agent w1:p9"}, f.calls); diff != "" {
+				t.Errorf("calls (-want +got):\n%s", diff)
+			}
+			f.mu.Lock()
+			f.paneAgentErr = nil
+			f.focusErr = nil
+			f.paneAgents = map[string]*herdr.Agent{"w1:p9": {PaneID: "w1:p9", Kind: "claude"}}
+			f.mu.Unlock()
+			if got := postFocusTask(t, h, "one"); got.Result != "focused_resumed" {
+				t.Errorf("click after herdr is back = %+v, want focused_resumed", got)
+			}
+		})
+	}
+}

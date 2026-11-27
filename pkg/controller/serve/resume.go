@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/suzuki-shunsuke/saki/pkg/claudesession"
+	"github.com/suzuki-shunsuke/saki/pkg/herdr"
 	"github.com/suzuki-shunsuke/saki/pkg/task"
 )
 
@@ -43,7 +44,7 @@ func (l *Launcher) resume(ctx context.Context, logger *slog.Logger, t *task.Task
 // resumeInTab resumes the session, which no other request is resuming, in a new tab, or
 // focuses the tab it was resumed in before.
 func (l *Launcher) resumeInTab(ctx context.Context, logger *slog.Logger, t *task.Task, session string) *focusResponse {
-	if res := l.focusResumedPane(ctx, t, session); res != nil {
+	if res := l.focusResumedPane(ctx, logger, t, session); res != nil {
 		return res
 	}
 	record, err := claudesession.Find(l.ConfigDir, session)
@@ -90,6 +91,13 @@ func (l *Launcher) resumeInTab(ctx context.Context, logger *slog.Logger, t *task
 	return &focusResponse{Result: resumeResumed, Message: "Resumed the session of " + t.Dir + " in a new tab"}
 }
 
+func (l *Launcher) resumedPaneFailure(logger *slog.Logger, err error) *focusResponse {
+	if herdr.IsNotRunning(err) {
+		return &focusResponse{Result: launchUnavailable, Message: herdrNotRunningMessage}
+	}
+	return l.resumeError(logger, err)
+}
+
 func (l *Launcher) resumeError(logger *slog.Logger, err error) *focusResponse {
 	logger.Error("resume the Claude Code session", "error", err)
 	return &focusResponse{Result: launchError, Message: "Failed to resume the session: " + err.Error()}
@@ -122,22 +130,29 @@ func (l *Launcher) isDir(path string) bool {
 
 // focusResumedPane focuses the pane of the tab created to resume the session before, if
 // Claude Code still runs there and it isn't another session, which is the case when Claude
-// Code exited and was started again or was cleared. Otherwise it forgets the pane and
-// returns nil.
-func (l *Launcher) focusResumedPane(ctx context.Context, t *task.Task, session string) *focusResponse {
+// Code exited and was started again or was cleared. When the pane is closed or isn't the
+// session's any more, it forgets the pane and returns nil to resume the session. When herdr
+// fails otherwise, the pane is kept and the failure is returned: the session may still be
+// starting there, and resuming it again would attach two Claude Code to it.
+func (l *Launcher) focusResumedPane(ctx context.Context, logger *slog.Logger, t *task.Task, session string) *focusResponse {
 	paneID := l.resumedPane(session)
 	if paneID == "" {
 		return nil
 	}
 	agent, err := l.Herdr.PaneAgent(ctx, paneID)
-	if err != nil || agent.Kind != "claude" || (agent.SessionID != "" && agent.SessionID != session) {
-		// An error includes the pane having been closed.
+	if herdr.HasCode(err, herdr.CodePaneNotFound) {
+		l.forgetPane(session)
+		return nil
+	}
+	if err != nil {
+		return l.resumedPaneFailure(logger, err)
+	}
+	if agent.Kind != "claude" || (agent.SessionID != "" && agent.SessionID != session) {
 		l.forgetPane(session)
 		return nil
 	}
 	if err := l.Herdr.Focus(ctx, paneID); err != nil {
-		l.forgetPane(session)
-		return nil
+		return l.resumedPaneFailure(logger, err)
 	}
 	return &focusResponse{Result: resumeFocusedResumed, Message: "Focused the tab where the session of " + t.Dir + " was resumed"}
 }

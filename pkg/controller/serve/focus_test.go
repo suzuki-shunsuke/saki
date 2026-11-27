@@ -42,6 +42,8 @@ type fakeHerdr struct {
 
 	// paneAgents are the agents PaneAgent returns by pane; a pane missing here is closed.
 	paneAgents map[string]*herdr.Agent
+	// paneAgentErr, if not nil, is returned by PaneAgent for a pane missing in paneAgents.
+	paneAgentErr error
 
 	// tabs are the tabs ListTabs returns. CreateTab adds the tab it creates, as tab w1:tN.
 	tabs        []herdr.Tab
@@ -117,7 +119,10 @@ func (f *fakeHerdr) PaneAgent(_ context.Context, paneID string) (*herdr.Agent, e
 	if a, ok := f.paneAgents[paneID]; ok {
 		return a, nil
 	}
-	return nil, &herdr.Error{Code: "pane_not_found", Message: "pane " + paneID + " not found"}
+	if f.paneAgentErr != nil {
+		return nil, f.paneAgentErr
+	}
+	return nil, &herdr.Error{Code: herdr.CodePaneNotFound, Message: "pane " + paneID + " not found"}
 }
 
 func (f *fakeHerdr) ListAgents(context.Context) ([]herdr.Agent, error) {

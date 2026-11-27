@@ -30,6 +30,8 @@ const (
 	CodePaneBusy = "agent_pane_busy"
 	// CodeAgentNotReady means the agent stopped during startup, e.g. at a dialog.
 	CodeAgentNotReady = "agent_not_ready"
+	// CodePaneNotFound means the pane doesn't exist, e.g. it was closed.
+	CodePaneNotFound = "pane_not_found"
 	// CodeAgentBlocked means the agent is waiting at a dialog, so a prompt wasn't sent.
 	CodeAgentBlocked = "agent_blocked"
 )
