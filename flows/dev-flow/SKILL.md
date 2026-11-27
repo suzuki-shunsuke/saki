@@ -25,12 +25,30 @@ If a human judges it necessary and explicitly invokes the skill, start the flow 
 1. Look in tasks/ for a task corresponding to the request
 1. If there is none, generate the task documents from the templates before writing any code, write Background / What / Why / Scope / Out of Scope, and ask the human for a review (start from step 1 of Steps). If the request is too vague to write these, ask what they want implemented
     - If what to do (What) is not yet decided and investigation or organizing information is needed to decide it, start an investigation task (see "Investigation Tasks")
-1. If there is one, determine the progress from task.yaml's `type` and `status`, which sections are filled in, and the decision log in details.md, and resume from the next step
+1. If there is one, determine the progress from task.yaml's `type` and `status`, which sections are filled in, and the decision log in details.md, and resume from the next step. Name the herdr tab after the task (see "Naming the herdr Tab")
 
 Work on each task in its own herdr pane.
 
 - If your prompt contains "This pane is dedicated to this task. Don't open another pane.", you are already in that pane: proceed here without opening another pane
 - Otherwise, open a new pane in herdr, start Claude Code there, and give it the prompt `Run "saki skill show dev-flow" and follow the instructions. This pane is dedicated to this task. Don't open another pane.` followed by the request
+
+### Naming the herdr Tab
+
+`saki serve` creates the tab of a task started from its new task form with the label `new task`, because the task id isn't decided yet.
+Once the task id is decided, rename that tab to `task <task id>`, the same label `saki serve` gives the tab of a session started from a task's row, so that the tabs of tasks running in parallel can be told apart.
+
+- Only an agent whose prompt contains "This pane is dedicated to this task. Don't open another pane." does this. An agent that opens another pane for the task leaves its own tab alone
+- Do it once, when the id of the task this session works on is decided: after the human confirms the task id of a new task (before creating `tasks/<task id>/`), or when you find the task to resume in tasks/
+- Don't do it for a task you create for another task, such as a sub task, a task derived from an investigation task, a task created from Follow-ups, or a task split off during design. The tab belongs to the task this session works on
+- Rename the tab only when the environment variable `HERDR_TAB_ID` is set and the tab's current label is exactly `new task`. Otherwise do nothing and say nothing about it. Any other label was given by `saki serve`, the human, or another task, so don't overwrite it
+
+```sh
+herdr tab get "$HERDR_TAB_ID" # the current label is result.tab.label
+herdr tab rename "$HERDR_TAB_ID" "task <task id>"
+```
+
+- If `herdr` isn't found or returns an error, tell the human in a sentence and continue the task. Don't retry
+- If the task id changes later in this session, and the tab still has the label `task <old task id>` you gave it in this session, rename it to `task <new task id>`. Don't rename a tab you didn't rename in this session, even if its label is `task <old task id>`
 
 ### Local Supplements
 
@@ -48,7 +66,7 @@ Normally the flow starts before the pull request is created, but sometimes desig
 This only covers pull requests you (a human or an agent) created and will fix and manage with this flow from now on. If asked to review a pull request created by someone else, follow the pr-review flow (`saki skill show pr-review`) instead of this flow.
 In that case too, generate documents from the pull request and bring it into the flow, so that the human can understand the pull request and review and fix it properly.
 
-1. Write Background / What / Why / Scope / Out of Scope / Behaviour / Implementation Plan / PR Explanation from the pull request's contents
+1. Write Background / What / Why / Scope / Out of Scope / Behaviour / Implementation Plan / PR Explanation from the pull request's contents. Once the task id is decided, name the herdr tab after the task (see "Naming the herdr Tab")
 1. Get the human's approval of Background / What / Why / Scope / Out of Scope and Behaviour. If the pull request contains out-of-scope changes, point them out at this time
 1. Join step 3 of Steps at the pull request review. If the code changes during review, rewrite the PR Explanation at the end
 
@@ -117,7 +135,7 @@ pull_requests:
 
 ### 1. Settle the Direction (Human Approves)
 
-1. Generate task.yaml and the documents from the templates. Skip if they already exist
+1. Generate task.yaml and the documents from the templates. Skip if they already exist. Once the task id is decided, name the herdr tab after the task (see "Naming the herdr Tab")
 1. Write Background / What / Why / Scope / Out of Scope
     - This stage confirms that the problem being solved and the direction are right before thinking about details
     - See "Writing the Overview" for how to write it
@@ -208,7 +226,7 @@ Separating investigation from implementation lets the human approve the investig
 
 ### 1. Settle the Investigation's Direction (Human Approves)
 
-1. Generate task.yaml and the document from the templates
+1. Generate task.yaml and the document from the templates. Once the task id is decided, name the herdr tab after the task (see "Naming the herdr Tab")
 1. Write Background / What / Why / Scope / Out of Scope
     - Background: what is already known and the history, as premises for the investigation
     - What: what to investigate and organize
