@@ -231,8 +231,9 @@ th {
   // name or the description (or, for a pull request or issue URL, the same pull request or
   // issue is in the task's pull_requests or issues, and for the URL of another page in a
   // repository, the same repository is in the task's repositories), each field condition has
-  // a value in the task's field, and no field exclusion has one. Everything is compared ignoring case. With no conditions,
-  // every task matches. fields maps each key to the task's values of the field (lowercase).
+  // a value in the task's field, and no field exclusion has one. Everything is compared
+  // ignoring case. With no conditions, every task matches. fields maps each key to the task's
+  // values of the field (lowercase).
   const matches = (q, name, description, fields) => {
     const n = name.toLowerCase();
     const d = description.toLowerCase();
