@@ -169,7 +169,7 @@ Write improvement ideas outside the pull request's purpose in Follow-ups, not in
 ### 5. Hand Over to the Human
 
 1. Set `status` to `in-review`, unless a `done` review was resumed without an update of the pull request (see "task.yaml")
-1. Open the documents with `mo` (`mo tasks/<review id>/review.md tasks/<review id>/pr-explanation.md`)
+1. Open the documents with `mo` in the review's group (`mo --target <review id> tasks/<review id>/review.md tasks/<review id>/pr-explanation.md`). The group is named after the review's directory, the same group `saki serve`'s `mo` button opens, so the documents don't pile up in the `default` group mixed with other tasks'
 1. The human reads the documents and asks questions in conversation with the agent. The agent answers and reflects the answers in the documents if needed (mo reloads automatically on save)
 1. The human decides which Review Findings to comment on the pull request, and whether to Approve, Request changes, or Comment
 
