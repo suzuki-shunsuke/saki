@@ -86,7 +86,7 @@ func postFocusTask(t *testing.T, h http.Handler, task string) focusResult {
 
 func newResumeHandler(t *testing.T, f *fakeHerdr, l *serve.Launcher) http.Handler {
 	t.Helper()
-	return serve.NewHandler(slog.New(slog.DiscardHandler), resumeTasksDir(t), nil, f, nil, l)
+	return serve.NewHandler(slog.New(slog.DiscardHandler), "", resumeTasksDir(t), nil, f, nil, l)
 }
 
 // noPaneAgents are agents of other sessions, so that no task's session has a pane.

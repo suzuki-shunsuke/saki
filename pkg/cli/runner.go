@@ -46,7 +46,7 @@ See https://github.com/suzuki-shunsuke/saki for details.`,
 	}
 	gFlags.Set(cmd.PersistentFlags())
 	cmd.AddCommand(
-		serve.New(logger, gFlags, acts.serve),
+		serve.New(logger, gFlags, env.Version, acts.serve),
 		skill.New(),
 		assignee.New(env.Getenv, acts.assignee),
 	)

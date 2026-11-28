@@ -9,6 +9,25 @@ body {
   font-family: system-ui, sans-serif;
   margin: 16px;
 }
+#header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+#logo {
+  font-size: 1.5em;
+  font-weight: bold;
+}
+#version {
+  font-size: 0.8em;
+  color: #666;
+}
+#repo-link {
+  margin-left: auto;
+}
 #columns {
   display: flex;
   flex-wrap: wrap;
@@ -77,7 +96,11 @@ th {
 </style>
 </head>
 <body>
-<h1>Tasks</h1>
+<header id="header">
+<span id="logo">saki</span>
+<span id="version">{{.Version}}</span>
+<a id="repo-link" href="https://github.com/suzuki-shunsuke/saki" target="_blank" rel="noopener noreferrer">GitHub</a>
+</header>
 <form id="launch">
 <textarea id="launch-text" rows="4" placeholder="Describe a task to create with dev-flow, or paste a pull request URL to review" aria-label="Describe a task to create with dev-flow, or paste a pull request URL to review"></textarea>
 <button type="submit" id="launch-button" disabled>Create task</button>

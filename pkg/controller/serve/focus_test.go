@@ -279,7 +279,7 @@ func TestOpen(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			h := serve.NewHandler(slog.New(slog.DiscardHandler), focusTasksDir(t), nil, tt.herdr, nil, nil)
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), "", focusTasksDir(t), nil, tt.herdr, nil, nil)
 			body, err := json.Marshal(map[string]string{"task": tt.task})
 			if err != nil {
 				t.Fatal(err)
@@ -322,7 +322,7 @@ func TestOpenRejected(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			f := &fakeHerdr{agents: []herdr.Agent{{PaneID: "w1:p1", Kind: "claude", SessionID: "s1"}}}
-			h := serve.NewHandler(slog.New(slog.DiscardHandler), focusTasksDir(t), nil, f, nil, nil)
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), "", focusTasksDir(t), nil, f, nil, nil)
 			rec := postOpen(t, h, tt.body, tt.contentType, tt.origin)
 			if rec.Code != tt.want {
 				t.Errorf("status = %d, want %d", rec.Code, tt.want)
@@ -341,7 +341,7 @@ func TestOpenStartsNewSession(t *testing.T) {
 	dir := emptyTasksDir(t)
 	writeTask(t, dir, "two", "name: two\n")
 	f := &fakeHerdr{startErrs: []error{busy()}}
-	h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, f, nil, newLauncher(f))
+	h := serve.NewHandler(slog.New(slog.DiscardHandler), "", dir, nil, f, nil, newLauncher(f))
 	rec := postOpen(t, h, `{"task":"two"}`, "application/json", "http://127.0.0.1:8080")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)

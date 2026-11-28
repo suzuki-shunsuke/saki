@@ -22,6 +22,8 @@ type Args struct {
 	*flag.GlobalFlags
 
 	Port int
+	// Version is the version of saki, shown in the page header.
+	Version string
 }
 
 // Action runs the serve command with the parsed flag values.
@@ -30,9 +32,10 @@ type Action func(ctx context.Context, args *Args) error
 // New creates the serve command. action replaces what the command does, so that a
 // test can check the parsed flag values without starting the server; nil runs the
 // server.
-func New(logger *slogutil.Logger, gFlags *flag.GlobalFlags, action Action) *cobra.Command {
+func New(logger *slogutil.Logger, gFlags *flag.GlobalFlags, version string, action Action) *cobra.Command {
 	args := &Args{
 		GlobalFlags: gFlags,
+		Version:     version,
 	}
 	if action == nil {
 		action = func(ctx context.Context, args *Args) error {
@@ -94,5 +97,6 @@ func run(ctx context.Context, logger *slogutil.Logger, args *Args) error {
 		HerdrPaneID:     os.Getenv("HERDR_PANE_ID"),
 		Dir:             dir,
 		ClaudeConfigDir: claudesession.ConfigDir(os.Getenv, home),
+		Version:         args.Version,
 	})
 }

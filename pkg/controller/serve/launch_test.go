@@ -43,7 +43,7 @@ func postLaunch(t *testing.T, l *serve.Launcher, text string) focusResult {
 // postLaunchKind sends a launch request of the kind, or without one when kind is empty.
 func postLaunchKind(t *testing.T, l *serve.Launcher, text, kind string) focusResult {
 	t.Helper()
-	h := serve.NewHandler(slog.New(slog.DiscardHandler), emptyTasksDir(t), nil, nil, nil, l)
+	h := serve.NewHandler(slog.New(slog.DiscardHandler), "", emptyTasksDir(t), nil, nil, nil, l)
 	req := map[string]string{"text": text}
 	if kind != "" {
 		req["kind"] = kind
@@ -289,7 +289,7 @@ func TestLaunchReviewAtOnce(t *testing.T) {
 	t.Parallel()
 	// The first request is held while creating its tab, and the second is sent meanwhile.
 	f := &fakeHerdr{tabListed: make(chan struct{}), createRelease: make(chan struct{})}
-	h := serve.NewHandler(slog.New(slog.DiscardHandler), emptyTasksDir(t), nil, nil, nil, newLauncher(f))
+	h := serve.NewHandler(slog.New(slog.DiscardHandler), "", emptyTasksDir(t), nil, nil, nil, newLauncher(f))
 	results := make(chan focusResult, 2)
 	send := func() {
 		go func() {
@@ -482,7 +482,7 @@ func TestLaunchRejected(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			f := &fakeHerdr{}
-			h := serve.NewHandler(slog.New(slog.DiscardHandler), emptyTasksDir(t), nil, nil, nil, newLauncher(f))
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), "", emptyTasksDir(t), nil, nil, nil, newLauncher(f))
 			rec := postFocusPath(t, h, "/launch", tt.body, tt.contentType, tt.origin)
 			if rec.Code != tt.want {
 				t.Errorf("status = %d, want %d", rec.Code, tt.want)
@@ -498,7 +498,7 @@ func TestLaunchContinuesAfterDisconnect(t *testing.T) {
 	t.Parallel()
 	f := &fakeHerdr{startErrs: []error{busy()}}
 	var logs bytes.Buffer
-	h := serve.NewHandler(slog.New(slog.NewTextHandler(&logs, nil)), emptyTasksDir(t), nil, nil, nil, newLauncher(f))
+	h := serve.NewHandler(slog.New(slog.NewTextHandler(&logs, nil)), "", emptyTasksDir(t), nil, nil, nil, newLauncher(f))
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // The browser went away before starting finished.
 	req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/launch", strings.NewReader(`{"text":"x"}`))
@@ -559,7 +559,7 @@ func TestNew(t *testing.T) {
 				agents:    []herdr.Agent{{PaneID: "w1:p5", Kind: "claude", SessionID: "s1"}},
 				startErrs: []error{busy()},
 			}
-			h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, f, nil, newLauncher(f))
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), "", dir, nil, f, nil, newLauncher(f))
 			got := postNew(t, h, tt.task)
 			want := focusResult{Result: "started", Message: "Started a new Claude Code session for " + tt.task + " in a new tab"}
 			if diff := cmp.Diff(want, got); diff != "" {
@@ -620,7 +620,7 @@ func TestNewNotStarted(t *testing.T) {
 			if tt.paneID == "-" {
 				l.PaneID = ""
 			}
-			h := serve.NewHandler(slog.New(slog.DiscardHandler), newTasksDir(t), nil, tt.herdr, nil, l)
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), "", newTasksDir(t), nil, tt.herdr, nil, l)
 			got := postNew(t, h, tt.task)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("response (-want +got):\n%s", diff)
@@ -650,7 +650,7 @@ func TestNewRejected(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			f := &fakeHerdr{}
-			h := serve.NewHandler(slog.New(slog.DiscardHandler), newTasksDir(t), nil, f, nil, newLauncher(f))
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), "", newTasksDir(t), nil, f, nil, newLauncher(f))
 			rec := postFocusPath(t, h, "/new", tt.body, tt.contentType, tt.origin)
 			if rec.Code != tt.want {
 				t.Errorf("status = %d, want %d", rec.Code, tt.want)
@@ -681,7 +681,7 @@ func TestNewReview(t *testing.T) {
 			dir := emptyTasksDir(t)
 			writeTask(t, dir, "review_aquaproj_aqua_1234", "name: review_aquaproj_aqua_1234\ntype: pr-review\npull_requests:\n  - https://github.com/aquaproj/aqua/pull/1234\n")
 			f := &fakeHerdr{tabs: tt.tabs, startErrs: []error{busy()}}
-			h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, f, nil, newLauncher(f))
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), "", dir, nil, f, nil, newLauncher(f))
 			got := postNew(t, h, "review_aquaproj_aqua_1234")
 			if tt.focus != "" {
 				want := focusResult{Result: "focused_existing", Message: "A tab is already reviewing AquaProj/Aqua#1234: focused it"}

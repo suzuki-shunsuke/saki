@@ -208,7 +208,7 @@ func TestOpenInMo(t *testing.T) {
 			t.Parallel()
 			dir, docs := moTasksDir(t)
 			f := &fakeMo{err: tt.err}
-			h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, nil, f, nil)
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), "", dir, nil, nil, f, nil)
 			body, err := json.Marshal(map[string]string{"task": tt.task})
 			if err != nil {
 				t.Fatal(err)
@@ -260,7 +260,7 @@ func TestOpenInMoRejected(t *testing.T) {
 			t.Parallel()
 			dir, _ := moTasksDir(t)
 			f := &fakeMo{}
-			h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, nil, f, nil)
+			h := serve.NewHandler(slog.New(slog.DiscardHandler), "", dir, nil, nil, f, nil)
 			rec := postMo(t, h, tt.body, tt.contentType, tt.origin)
 			if rec.Code != tt.want {
 				t.Errorf("status = %d, want %d", rec.Code, tt.want)
@@ -276,7 +276,7 @@ func TestHandlerMoButton(t *testing.T) {
 	t.Parallel()
 	dir := emptyTasksDir(t)
 	writeTask(t, dir, "foo", "name: foo\n")
-	h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, nil, nil, nil)
+	h := serve.NewHandler(slog.New(slog.DiscardHandler), "", dir, nil, nil, nil, nil)
 	body := getIndex(h).Body.String()
 	want := `<td data-col="name"><button type="button" class="mo-button" title="Open the documents in mo">mo</button><button type="button" class="new-button" title="Start a new Claude Code session for this task in a new herdr tab">new</button><button type="button" class="open-button" title="Open the Claude Code session of this task: focus its herdr pane, resume it in a new herdr tab if it has no pane, or start a new session if the task has none">open</button><div>foo</div></td>`
 	if !strings.Contains(body, want) {

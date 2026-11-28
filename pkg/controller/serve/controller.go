@@ -44,6 +44,8 @@ type Param struct {
 	// ClaudeConfigDir is Claude Code's configuration directory, where the records of the
 	// sessions to resume are read from.
 	ClaudeConfigDir string
+	// Version is the version of saki, shown in the page header.
+	Version string
 }
 
 // Serve serves the task list until ctx is canceled.
@@ -57,7 +59,7 @@ func Serve(ctx context.Context, logger *slog.Logger, param *Param) error {
 	// The handler warns about the failures, before listening so that the warnings precede
 	// the URL and are logged even when listen fails.
 	h := herdr.New()
-	handler := NewHandler(logger, param.TasksDir, result.Failures, h, mo.New(), &Launcher{
+	handler := NewHandler(logger, param.Version, param.TasksDir, result.Failures, h, mo.New(), &Launcher{
 		Herdr:     h,
 		PaneID:    param.HerdrPaneID,
 		Dir:       param.Dir,
