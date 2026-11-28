@@ -274,7 +274,7 @@ At this stage, follow these rules.
 
 ### 4. The Human Decides
 
-1. Open the final documents and the PR Explanation with `mo` (`mo tasks/<task id>/<task id>.md tasks/<task id>/pr-explanation.md`). The human reads the final documents, the decision log in details.md, and the PR Explanation, and asks questions in conversation with the agent. The agent answers and, if needed, reflects the answers in the documents and the PR Explanation (mo reloads automatically on save)
+1. Open the final documents and the PR Explanation with `mo` in the task's group (`mo --target <task id> tasks/<task id>/<task id>.md tasks/<task id>/pr-explanation.md`). The group is named after the task's directory, the same group `saki serve`'s `mo` button opens, so the documents don't pile up in the `default` group mixed with other tasks'. The human reads the final documents, the decision log in details.md, and the PR Explanation, and asks questions in conversation with the agent. The agent answers and, if needed, reflects the answers in the documents and the PR Explanation (mo reloads automatically on save)
 1. The human decides on the pull request
 1. The human decides which Follow-ups become tasks, and the agent creates them
     - A task created from Follow-ups is a draft: generate it from the templates with `status: backlog`, write what is known in Background / What / Why, and note in Background which task's Follow-ups it came from. Its overview is approved from step 1 of Steps when it is started
