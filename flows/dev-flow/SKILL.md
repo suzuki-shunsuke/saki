@@ -38,7 +38,7 @@ Work on each task in its own herdr pane.
 Once the task id is decided, rename that tab to `task <task id>`, the same label `saki serve` gives the tab of a session started with a task's new or open button, so that the tabs of tasks running in parallel can be told apart.
 
 - Only an agent whose prompt contains "This pane is dedicated to this task. Don't open another pane." does this. An agent that opens another pane for the task leaves its own tab alone
-- Do it once, when the id of the task this session works on is decided: after the human confirms the task id of a new task (before creating `tasks/<task id>/`), or when you find the task to resume in tasks/
+- Do it once, when the id of the task this session works on is decided: when you decide the task id of a new task (before creating `tasks/<task id>/`), or when you find the task to resume in tasks/
 - Don't do it for a task you create for another task, such as a sub task, a task derived from an investigation task, a task created from Follow-ups, or a task split off during design. The tab belongs to the task this session works on
 - Rename the tab only when the environment variable `HERDR_TAB_ID` is set and the tab's current label is exactly `new task`. Otherwise do nothing and say nothing about it. Any other label was given by `saki serve`, the human, or another task, so don't overwrite it
 
@@ -67,7 +67,7 @@ This only covers pull requests you (a human or an agent) created and will fix an
 In that case too, generate documents from the pull request and bring it into the flow, so that the human can understand the pull request and review and fix it properly.
 
 1. Write Background / What / Why / Scope / Out of Scope / Behaviour / Implementation Plan / PR Explanation from the pull request's contents. Once the task id is decided, name the herdr tab after the task (see "Naming the herdr Tab")
-1. Get the human's approval of Background / What / Why / Scope / Out of Scope and Behaviour. If the pull request contains out-of-scope changes, point them out at this time
+1. Get the human's approval of Background / What / Why / Scope / Out of Scope and Behaviour, showing the task id with them (see "Task ID"). If the pull request contains out-of-scope changes, point them out at this time
 1. Join step 3 of Steps at the pull request review. If the code changes during review, rewrite the PR Explanation at the end
 
 Writing the documents and getting them approved are one stage, so keep `status` at `detail-design` through steps 1 and 2, and tell them apart with the Next Action (see "The Head of the Task Document").
@@ -83,13 +83,37 @@ tasks/
     pr-explanation.md
 ```
 
-- The agent proposes `<task id>` and the human confirms it
+- The agent decides `<task id>` without asking the human (see "Task ID")
 - Create documents per task. If you decide to split a task during design, split the documents too. Scope / Out of Scope is the criterion for whether to accept review comments, so if it is not split per task, judgments become inconsistent
   - When creating multiple pull requests, create documents per pull request as sub tasks, and make each pull request's scope clear. Reduce rework by settling the pull requests needed for the whole parent task and each pull request's specification before creating any pull request
 - `task.yaml`: the task's metadata, generated from `saki skill show dev-flow templates/task.yaml` (see "task.yaml")
 - `<task id>.md`: the README-equivalent document, generated from `saki skill show dev-flow templates/design.md` (`saki skill show dev-flow templates/investigation.md` for investigation tasks). Give it a unique name rather than something like README.md so it is distinguishable by file name. It starts with a short description of the task and the Next Action (see "The Head of the Task Document")
 - `details.md`: records what was discussed with the agent during design and the decisions made in review. Keeping it as primary information matters, but it grows large, is hard for humans to get the point of, and wastes context if the agent reads it all every time, so keep it separate from `<task id>.md`
 - `pr-explanation.md`: the PR Explanation (see "PR Explanation Format"). Not created for investigation tasks
+
+### Task ID
+
+When you create a task, decide its task id yourself and create `tasks/<task id>/` without asking the human to confirm it.
+Humans almost always accepted the proposed id as it was, and asking only made the agent stop before writing the overview.
+This applies to every task you create: a new task, a sub task, an investigation task, a task created from an investigation task or from Follow-ups, a task split off during design, and a task for a pull request that already exists.
+
+- Choose an id that no directory in tasks/ already uses
+- Keep it short and make it tell what the task is
+- Follow the naming of the existing tasks in tasks/ (e.g. a prefix with the product name, the separator)
+- When you ask the human to approve the overview, show the task id with it, so that the human can ask for another id there. That is the approval in step 1 of Steps, in step 1 of investigation tasks, and in step 2 of "When a Pull Request Already Exists"
+
+#### Renaming a Task
+
+The human may ask to change a task id at any time. When asked:
+
+1. Confirm that no directory in tasks/ uses the new id
+1. Rename `tasks/<old id>/` to `tasks/<new id>/` and `<old id>.md` to `<new id>.md`, and set `name` in task.yaml to the new id
+1. Search tasks/ for the old id and replace the references to it with the new id
+    - In task.yaml: the parent's `sub_tasks`, the child's `parent_task`, the investigation task's `derived_tasks`, and the derived task's `derived_from`
+    - In documents: ids written in other tasks' Follow-ups, and the original task's id and links to its documents in the Background of tasks created from Follow-ups or from an investigation task
+1. Rename the herdr tab as "Naming the herdr Tab" says
+
+Don't change anything outside tasks/, such as the branch, the worktree, or the pull request's title and body.
 
 ### The Head of the Task Document
 
@@ -210,7 +234,7 @@ pull_requests:
     - See "Writing the Overview" for how to write it
 1. If there are blocking Open Questions, ask the human before the agent review (see "Blocking Open Questions")
 1. Have an agent review it, and repeat until it converges (see "Review Rules")
-1. Get the human's approval of Background / What / Why / Scope / Out of Scope. This becomes the basis for every later decision
+1. Get the human's approval of Background / What / Why / Scope / Out of Scope, showing the task id with them (see "Task ID"). This becomes the basis for every later decision
 
 #### Blocking Open Questions
 
@@ -304,7 +328,7 @@ Separating investigation from implementation lets the human approve the investig
     - Why: why the investigation is needed. What is undecided, and what will be decided from the investigation's conclusion
     - Scope / Out of Scope: what is and is not investigated
 1. Have an agent review it, and repeat until it converges (see "Review Rules")
-1. Get the human's approval
+1. Get the human's approval, showing the task id with it (see "Task ID")
 
 ### 2. Investigate (AI Runs)
 
