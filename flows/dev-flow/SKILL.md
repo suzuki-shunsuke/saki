@@ -354,7 +354,7 @@ Separating investigation from implementation lets the human approve the investig
 
 ### 1. Settle the Investigation's Direction (Human Approves)
 
-1. Generate task.yaml and the document from the templates. Once the task id is decided, name the herdr tab after the task (see "Naming the herdr Tab")
+1. Generate task.yaml and the document from the templates. Skip if they already exist. Once the task id is decided, name the herdr tab after the task (see "Naming the herdr Tab")
 1. Write Background / What / Why / Scope / Out of Scope
     - Background: what is already known and the history, as premises for the investigation
     - What: what to investigate and organize
