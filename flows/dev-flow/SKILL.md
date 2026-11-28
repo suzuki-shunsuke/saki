@@ -56,7 +56,7 @@ When you create a task from the approved Next Tasks of an investigation task (st
 Create the task as a draft and stop there: writing the overview's review and approval into this session would leave the new task's design in another task's session, and the new task's own session would lack it.
 The new task is started later in its own session.
 
-This doesn't apply to sub tasks or to a task split off during design: settle those in the parent task's session as before.
+This doesn't apply to sub tasks or to a task split off during design (see "Document Layout").
 
 In the original task's session:
 
