@@ -50,6 +50,38 @@ herdr tab rename "$HERDR_TAB_ID" "task <task id>"
 - If `herdr` isn't found or returns an error, tell the human in a sentence and continue the task. Don't retry
 - If the task id changes later in this session, and the tab still has the label `task <old task id>` you gave it in this session, rename it to `task <new task id>`. Don't rename a tab you didn't rename in this session, even if its label is `task <old task id>`
 
+### Drafting a Task for Later
+
+When you create a task from the approved Next Tasks of an investigation task (step 3 of "Investigation Tasks") or from the Follow-ups chosen in step 4 of Steps, you are in another task's session.
+Create the task as a draft and stop there: writing the overview's review and approval into this session would leave the new task's design in another task's session, and the new task's own session would lack it.
+The new task is started later in its own session.
+
+This doesn't apply to sub tasks or to a task split off during design: settle those in the parent task's session as before.
+
+In the original task's session:
+
+1. Decide the task id as "Task ID" says, and generate task.yaml and the documents from the templates
+    - Set `type` to `implementation`, or to `investigation` if deciding what to do needs investigation, whichever way the task is created
+    - Set `status` to `backlog`. The human raises it to `todo` to start the task this week
+    - Write the short description, `assignees`, and the other fields as "The Head of the Task Document" and "task.yaml" say
+1. Write only what is known in this session in the overview: Background / What / Why / Scope / Out of Scope, and for an investigation task the Questions and Done When in What. Leave a section empty rather than guess
+    - In Background, write which task it came from
+    - Write the open questions known in this session in Open Questions for an implementation task. An investigation task's template has no Open Questions, so write them as candidate Questions
+    - Create details.md, and record how the task came about (which task and which Next Task or Follow-up it came from, what the human said or decided about it) and what you ran to verify the claims you wrote (see "Verify Before Writing")
+    - Don't write Behaviour and the sections after it (Findings and after for an investigation task)
+1. Write the Next Action as the first work of step 1 for its `type`, saying that an unreviewed draft exists (e.g. "Write the overview (an unreviewed draft exists)", or "Write the investigation's direction (an unreviewed draft exists)" for an investigation task)
+1. Don't have an agent review the draft, don't ask the human to approve it, and don't open a pane for it. "Work on each task in its own herdr pane" is about starting work on a task, and creating a draft is not starting it. Leave the herdr tab alone (see "Naming the herdr Tab")
+1. Tell the human the ids of the tasks you created, and that each is started by opening its session from `saki serve`
+
+Then the original task continues its own flow: an investigation task is set to `done`, and a task in step 4 continues to the merge.
+
+In the draft task's session, `status` (`backlog` or `todo`) and the Next Action tell that step 1 starts from writing the overview, or the investigation's direction for an investigation task. Follow step 1 of Steps for an implementation task, and step 1 of "Investigation Tasks" for an investigation task.
+
+1. Set `status` to `overview-design`
+1. Don't generate task.yaml and the documents again: they already exist
+1. Read the draft, write the empty sections, and revise the written ones. The draft has been neither reviewed nor approved. For an implementation task, judge again whether each Open Question is blocking
+1. Continue with the rest of that step 1
+
 ### Local Supplements
 
 Organizations and projects may add their own rules to this flow (e.g. the language of documents, pull request conventions).
@@ -161,7 +193,7 @@ Don't change anything outside tasks/, such as the branch, the worktree, or the p
 | When a Pull Request Already Exists: waiting for the human's approval | `detail-design` | Approving the overview and Behaviour ("Approve the overview and the detailed design") |
 | When a Pull Request Already Exists: after the approval, joining step 3 at the pull request review | `doing` | Reviewing the pull request ("Review the pull request") |
 | A parent task split into sub tasks, while the sub tasks progress | unchanged | The sub tasks left to do ("Proceed with sub tasks X and Y") |
-| Not started yet (including drafts created from Follow-ups) | `backlog` / `todo` | Designing the overview, or writing the investigation's direction for an investigation task |
+| Not started yet (including drafts, see "Drafting a Task for Later") | `backlog` / `todo` | Designing the overview, or writing the investigation's direction for an investigation task |
 | Stopped | `pending` | Why it stopped and what is needed to resume ("Wait for the release of X, then resume") |
 | Cancelled | `cancel` | Nothing ("None (cancelled)") |
 | Completed | `done` | Nothing ("None (done)") |
@@ -301,7 +333,7 @@ At this stage, follow these rules.
 1. Open the final documents and the PR Explanation with `mo` in the task's group (`mo --target <task id> tasks/<task id>/<task id>.md tasks/<task id>/pr-explanation.md`). The group is named after the task's directory, the same group `saki serve`'s `mo` button opens, so the documents don't pile up in the `default` group mixed with other tasks'. The human reads the final documents, the decision log in details.md, and the PR Explanation, and asks questions in conversation with the agent. The agent answers and, if needed, reflects the answers in the documents and the PR Explanation (mo reloads automatically on save)
 1. The human decides on the pull request
 1. The human decides which Follow-ups become tasks, and the agent creates them
-    - A task created from Follow-ups is a draft: generate it from the templates with `status: backlog`, write what is known in Background / What / Why, and note in Background which task's Follow-ups it came from. Its overview is approved from step 1 of Steps when it is started
+    - Create each as a draft (see "Drafting a Task for Later"). Its overview is reviewed and approved in its own session when it is started
     - In the original task's Follow-ups, write the task id next to each item
 1. The human merges
 
@@ -346,7 +378,7 @@ If the approved Questions / Scope cannot produce an answer, or the investigation
 1. Create a new task for each approved Next Task (`type: implementation`, or `type: investigation` if further investigation is needed)
     - In the new task's Background, write the investigation task's conclusion and a link to the investigation task's document
     - Set both `derived_from` / `derived_tasks` in task.yaml
-    - New tasks start from step 1 of Steps. Write the overview based on the investigation's conclusion and get the human's approval
+    - Create each as a draft (see "Drafting a Task for Later"). Its overview is written from the investigation's conclusion, and reviewed and approved in its own session when it is started
 1. Set the investigation task's `status` to `done`
 
 ## Review Rules
