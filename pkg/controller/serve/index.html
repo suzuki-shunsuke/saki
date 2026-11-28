@@ -186,13 +186,27 @@ th {
     return m ? `${m[1]}/${m[2]}#${m[3]}` : null;
   };
 
+  // githubRepoPattern matches the URL of a GitHub repository, optionally followed by a path, a
+  // query, or a fragment, so the URL of any page in the repository (.../tree/main/pkg,
+  // .../pulls, ...?tab=readme-ov-file) matches.
+  const githubRepoPattern = /^https:\/\/github\.com\/([^/?#]+)\/([^/?#]+)(?:[/?#].*)?$/u;
+
+  // githubRepo returns <owner>/<repo> of a lowercase term that is the URL of a page in a GitHub
+  // repository, and null for any other term. Callers check githubRef first, because the URL
+  // of a pull request or an issue matches too.
+  const githubRepo = (t) => {
+    const m = githubRepoPattern.exec(t);
+    return m ? `${m[1]}/${m[2]}` : null;
+  };
+
   // parseQuery splits the lowercase terms into field conditions and the other words.
   // "<key>:a,b" keeps tasks whose field has a or b, and "-<key>:a,b" keeps tasks whose field
   // has neither. Only the first character is taken as "-", so hyphens in values (in-review)
   // are part of them, and everything after the first ":" is the value, so URLs work
   // (pr:https://...). Empty values are dropped, and a condition without values is ignored so
   // that the list doesn't go empty while "tag:" is being typed. Each word keeps the
-  // <owner>/<repo>#<number> of a pull request or issue URL as ref (null otherwise).
+  // <owner>/<repo>#<number> of a pull request or issue URL as ref (null otherwise), and the
+  // <owner>/<repo> of the URL of any other page in a repository as repo (null otherwise).
   const parseQuery = (ts) => {
     const q = { conditions: [], words: [] };
     for (const t of ts) {
@@ -201,7 +215,8 @@ th {
       const i = body.indexOf(":");
       const key = i < 0 ? "" : body.slice(0, i);
       if (!fieldKeys.includes(key)) {
-        q.words.push({ text: t, ref: githubRef(t) });
+        const ref = githubRef(t);
+        q.words.push({ text: t, ref, repo: ref === null ? githubRepo(t) : null });
         continue;
       }
       const values = body.slice(i + 1).split(",").filter((v) => v !== "");
@@ -214,14 +229,17 @@ th {
 
   // matches reports whether a task meets every condition of the query: each word is in the
   // name or the description (or, for a pull request or issue URL, the same pull request or
-  // issue is in the task's pull_requests or issues), each field condition has a value in the task's field, and no
-  // field exclusion has one. Everything is compared ignoring case. With no conditions,
-  // every task matches. fields maps each key to the task's values of the field (lowercase).
+  // issue is in the task's pull_requests or issues, and for the URL of another page in a
+  // repository, the same repository is in the task's repositories), each field condition has
+  // a value in the task's field, and no field exclusion has one. Everything is compared
+  // ignoring case. With no conditions, every task matches. fields maps each key to the task's
+  // values of the field (lowercase).
   const matches = (q, name, description, fields) => {
     const n = name.toLowerCase();
     const d = description.toLowerCase();
     return q.words.every((w) => n.includes(w.text) || d.includes(w.text) ||
-        (w.ref !== null && (fields.pr.has(w.ref) || fields.issue.has(w.ref)))) &&
+        (w.ref !== null && (fields.pr.has(w.ref) || fields.issue.has(w.ref))) ||
+        (w.repo !== null && fields.repo.has(w.repo))) &&
       q.conditions.every((c) => c.values.some((v) => fields[c.key].has(v)) !== c.exclude);
   };
 
