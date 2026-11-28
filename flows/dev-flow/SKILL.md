@@ -53,7 +53,7 @@ herdr tab rename "$HERDR_TAB_ID" "task <task id>"
 
 ### Drafting a Task for Later
 
-When you create a task from the approved Next Tasks of an investigation task (step 3 of "Investigation Tasks") or from the Follow-ups chosen in step 4 of Steps, you are in another task's session.
+When you create a task from the approved Next Tasks of an investigation task, or from the Follow-ups chosen in step 3 of "Investigation Tasks" or in step 4 of Steps, you are in another task's session.
 Create the task as a draft and stop there: writing the overview's review and approval into this session would leave the new task's design in another task's session, and the new task's own session would lack it.
 The new task is started later in its own session.
 
@@ -189,7 +189,7 @@ Don't change anything outside tasks/, such as the branch, the worktree, or the p
 | Step 1 of investigation tasks: writing the investigation's direction and the agent review | `overview-design` | Writing the investigation's direction ("Write the investigation's direction") |
 | Step 1 of investigation tasks: waiting for the human's approval | `overview-design` | Approving the investigation's direction ("Approve the investigation's direction") |
 | Step 2 of investigation tasks: investigating and the agent review | `doing` | Investigating ("Investigate") |
-| Step 3 of investigation tasks: waiting for the human's approval | `in-review` | Approving the conclusion ("Approve the conclusion") |
+| Step 3 of investigation tasks: waiting for the human's approval | `in-review` | Approving the conclusion ("Approve the conclusion"). If there are Follow-ups, also list deciding which of them become tasks ("Decide which Follow-ups become tasks") |
 | When a Pull Request Already Exists: writing the documents | `detail-design` | Writing the overview and the specification from the pull request ("Write the overview and the detailed design from the pull request") |
 | When a Pull Request Already Exists: waiting for the human's approval | `detail-design` | Approving the overview and Behaviour ("Approve the overview and the detailed design") |
 | When a Pull Request Already Exists: after the approval, joining step 3 at the pull request review | `doing` | Reviewing the pull request ("Review the pull request") |
@@ -200,7 +200,7 @@ Don't change anything outside tasks/, such as the branch, the worktree, or the p
 | Completed | `done` | Nothing ("None (done)") |
 
 - While you wait for the human's answer to a question, write the question as the Next Action regardless of the table, and keep `status` at the value of that step. This covers blocking Open Questions, changes to approved sections in step 3, changes to an investigation's direction, review comments that go back and forth, and any other question. Once answered, go back to the Next Action of the step
-- While you do short work following the human's decision, such as creating tasks from the approved Next Tasks of an investigation task or from the Follow-ups chosen in step 4, write that work ("Create the derived tasks", "Create tasks from the Follow-ups"), and keep `status` at the value of that step
+- While you do short work following the human's decision, such as creating tasks from the approved Next Tasks of an investigation task or from the Follow-ups chosen in step 4 of Steps or step 3 of "Investigation Tasks", write that work ("Create the derived tasks", "Create tasks from the Follow-ups"), and keep `status` at the value of that step
 
 #### When to Update
 
@@ -256,7 +256,7 @@ pull_requests:
 - Once a task is `done` or `cancel` and nothing is left for the human, clean it up (see "Cleaning Up a Finished Task")
 - When you create a pull request or issue, add it to `pull_requests` / `issues`
 - When you create a sub task, set both the parent's `sub_tasks` and the child's `parent_task`
-- When you create a task from an investigation task, set both the investigation task's `derived_tasks` and the new task's `derived_from`. Distinguish these from sub tasks (one task split per pull request)
+- When you create a task from an investigation task's Next Tasks, set both the investigation task's `derived_tasks` and the new task's `derived_from`. Distinguish these from sub tasks (one task split per pull request). Don't set them for a task created from an investigation task's Follow-ups: like a task created from an implementation task's Follow-ups, it is linked by the id written in the original task's Follow-ups and by the original task written in its Background
 
 ## Steps
 
@@ -371,17 +371,22 @@ Separating investigation from implementation lets the human approve the investig
 1. In Findings, summarize what was learned for each Question. Show the evidence with links to details.md or the sources
 1. In Conclusion, write the investigation's conclusion (what to do and not do). If there are multiple options, write a comparison and the recommended option
 1. In Next Tasks, write candidate tasks to create from the conclusion. Write each in enough detail to convey an outline of its What / Why / Scope
+    - Next Tasks are the tasks needed to carry out the conclusion. Write out-of-scope improvements found along the way in Follow-ups instead. Don't write the same item in both
 1. Have an agent review it, and repeat until it converges. Have it check that the Questions are answered, that the Findings are based on evidence, and that the Conclusion follows from the Findings
 
 If the approved Questions / Scope cannot produce an answer, or the investigation's direction needs to change, do not decide on your own; ask the human, update the document, then proceed.
 
 ### 3. Decide on the Conclusion (Human Approves)
 
-1. Get the human's approval of Findings / Conclusion / Next Tasks
+1. Get the human's approval of Findings / Conclusion / Next Tasks. If there are Follow-ups, the human also decides which of them become tasks
 1. Create a new task for each approved Next Task (`type: implementation`, or `type: investigation` if further investigation is needed)
     - In the new task's Background, write the investigation task's conclusion and a link to the investigation task's document
     - Set both `derived_from` / `derived_tasks` in task.yaml
     - Create each as a draft (see "Drafting a Task for Later"). Its overview is written from the investigation's conclusion, and reviewed and approved in its own session when it is started
+1. Create a new task for each Follow-up the human chose
+    - Create each as a draft (see "Drafting a Task for Later"). Its overview is reviewed and approved in its own session when it is started
+    - In the investigation task's Follow-ups, write the task id next to each item
+    - Don't set `derived_from` / `derived_tasks` (see "task.yaml")
 1. Set the investigation task's `status` to `done`
 1. Once nothing is left for the human, clean the investigation task up (see "Cleaning Up a Finished Task")
 
