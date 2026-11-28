@@ -72,6 +72,7 @@ func searchURLs(urls []string) string {
 }
 
 type pageData struct {
+	Version string
 	Columns []column
 	Rows    []row
 }
@@ -169,14 +170,14 @@ func claudeSessions(t *task.Task) []item {
 }
 
 // NewHandler returns the handler serving the list of the tasks.
-// It reads the tasks of tasksDir on every request, so changes to task.yaml show up on
+// version is the version of saki, shown in the page header. It reads the tasks of tasksDir on every request, so changes to task.yaml show up on
 // reload. initialFailures are the failures of the read at startup, which NewHandler warns
 // about so that the first request doesn't repeat the warnings. When a task's open
 // button is clicked, h focuses the herdr pane of the task's session, l resumes the session in
 // a new tab when no pane is found, and l starts a new session when the task has none. m opens
 // a task's documents in mo when its mo button is clicked, and l starts Claude Code in a new
 // tab to create a task, or to start a new session for a task when its new button is clicked.
-func NewHandler(logger *slog.Logger, tasksDir string, initialFailures []*task.Failure, h Herdr, m Mo, l *Launcher) http.Handler {
+func NewHandler(logger *slog.Logger, version, tasksDir string, initialFailures []*task.Failure, h Herdr, m Mo, l *Launcher) http.Handler {
 	reporter := newFailureReporter(logger, initialFailures)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, _ *http.Request) {
@@ -188,7 +189,7 @@ func NewHandler(logger *slog.Logger, tasksDir string, initialFailures []*task.Fa
 			http.Error(w, "failed to read the tasks directory", http.StatusInternalServerError)
 			return
 		}
-		serveIndex(w, logger, result.Tasks)
+		serveIndex(w, logger, version, result.Tasks)
 	})
 	mux.HandleFunc("POST /open", func(w http.ResponseWriter, r *http.Request) {
 		serveOpen(w, r, logger, h, l, tasksDir)
@@ -205,8 +206,9 @@ func NewHandler(logger *slog.Logger, tasksDir string, initialFailures []*task.Fa
 	return checkHost(mux)
 }
 
-func serveIndex(w http.ResponseWriter, logger *slog.Logger, tasks []*task.Task) {
+func serveIndex(w http.ResponseWriter, logger *slog.Logger, version string, tasks []*task.Task) {
 	data := &pageData{
+		Version: version,
 		Columns: columns,
 		Rows:    make([]row, 0, len(tasks)),
 	}

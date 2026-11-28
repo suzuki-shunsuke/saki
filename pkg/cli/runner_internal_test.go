@@ -69,6 +69,7 @@ func TestNewCommand_flags(t *testing.T) { //nolint:funlen
 			exp: &received{Serve: &serve.Args{
 				GlobalFlags: &flag.GlobalFlags{},
 				Port:        8080,
+				Version:     "v1.2.3",
 			}},
 		},
 		{
@@ -77,6 +78,7 @@ func TestNewCommand_flags(t *testing.T) { //nolint:funlen
 			exp: &received{Serve: &serve.Args{
 				GlobalFlags: &flag.GlobalFlags{LogLevel: "debug"},
 				Port:        3000,
+				Version:     "v1.2.3",
 			}},
 		},
 		{
@@ -86,6 +88,7 @@ func TestNewCommand_flags(t *testing.T) { //nolint:funlen
 			exp: &received{Serve: &serve.Args{
 				GlobalFlags: &flag.GlobalFlags{LogLevel: "info"},
 				Port:        9000,
+				Version:     "v1.2.3",
 			}},
 		},
 		{
@@ -95,6 +98,7 @@ func TestNewCommand_flags(t *testing.T) { //nolint:funlen
 			exp: &received{Serve: &serve.Args{
 				GlobalFlags: &flag.GlobalFlags{},
 				Port:        3000,
+				Version:     "v1.2.3",
 			}},
 		},
 		{
@@ -104,6 +108,7 @@ func TestNewCommand_flags(t *testing.T) { //nolint:funlen
 			exp: &received{Serve: &serve.Args{
 				GlobalFlags: &flag.GlobalFlags{},
 				Port:        8080,
+				Version:     "v1.2.3",
 			}},
 		},
 		{
@@ -117,6 +122,7 @@ func TestNewCommand_flags(t *testing.T) { //nolint:funlen
 			exp: &received{Serve: &serve.Args{
 				GlobalFlags: &flag.GlobalFlags{LogLevel: "error"},
 				Port:        8080,
+				Version:     "v1.2.3",
 			}},
 		},
 	}

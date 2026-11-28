@@ -82,7 +82,7 @@ claude_sessions:
 	updated := time.Date(2026, 11, 25, 9, 30, 0, 0, time.Local) //nolint:gosmopolitan
 	setMtime(t, filepath.Join(dir, "alpha", "task.yaml"), updated)
 	setMtime(t, filepath.Join(dir, "beta", "task.yaml"), updated.Add(time.Hour))
-	h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, nil, nil, nil)
+	h := serve.NewHandler(slog.New(slog.DiscardHandler), "", dir, nil, nil, nil, nil)
 	rec := getIndex(h)
 
 	if rec.Code != http.StatusOK {
@@ -132,11 +132,30 @@ claude_sessions:
 	}
 }
 
+func TestHandlerHeader(t *testing.T) {
+	t.Parallel()
+	h := serve.NewHandler(slog.New(slog.DiscardHandler), "v1.2.3", tasksDir(t), nil, nil, nil, nil)
+	body := getIndex(h).Body.String()
+	// The whole elements are compared, because a task's repository may link to saki too.
+	for _, want := range []string{
+		`<span id="logo">saki</span>`,
+		`<span id="version">v1.2.3</span>`,
+		`<a id="repo-link" href="https://github.com/suzuki-shunsuke/saki" target="_blank" rel="noopener noreferrer">GitHub</a>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the page doesn't contain %s", want)
+		}
+	}
+	if strings.Contains(body, "<h1>Tasks</h1>") {
+		t.Error("the page still has the heading Tasks")
+	}
+}
+
 func TestHandlerReload(t *testing.T) {
 	t.Parallel()
 	dir := emptyTasksDir(t)
 	writeTask(t, dir, "alpha", "name: alpha\nstatus: doing\n")
-	h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, nil, nil, nil)
+	h := serve.NewHandler(slog.New(slog.DiscardHandler), "", dir, nil, nil, nil, nil)
 	if body := getIndex(h).Body.String(); !strings.Contains(body, ">doing<") {
 		t.Fatalf("the first request doesn't show the task: %s", body)
 	}
@@ -172,7 +191,7 @@ func TestHandlerWarnsOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	var logs bytes.Buffer
-	h := serve.NewHandler(slog.New(slog.NewTextHandler(&logs, nil)), dir, result.Failures, nil, nil, nil)
+	h := serve.NewHandler(slog.New(slog.NewTextHandler(&logs, nil)), "", dir, result.Failures, nil, nil, nil)
 	// The startup failure is warned when the handler is created, and requests don't repeat
 	// it while the task stays unreadable for the same reason.
 	getIndex(h)
@@ -186,7 +205,7 @@ func TestHandlerTasksDirRemoved(t *testing.T) {
 	t.Parallel()
 	dir := emptyTasksDir(t)
 	writeTask(t, dir, "alpha", "name: alpha\n")
-	h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, nil, nil, nil)
+	h := serve.NewHandler(slog.New(slog.DiscardHandler), "", dir, nil, nil, nil, nil)
 
 	moved := dir + ".moved"
 	if err := os.Rename(dir, moved); err != nil {
@@ -215,7 +234,7 @@ repositories: [https://github.com/suzuki-shunsuke/saki]
 issues: [https://github.com/suzuki-shunsuke/saki/issues/1#issuecomment-2]
 pull_requests: [https://github.com/suzuki-shunsuke/saki/pull/105, https://github.com/suzuki-shunsuke/saki/pull/106]
 `)
-	h := serve.NewHandler(slog.New(slog.DiscardHandler), dir, nil, nil, nil, nil)
+	h := serve.NewHandler(slog.New(slog.DiscardHandler), "", dir, nil, nil, nil, nil)
 	body := getIndex(h).Body.String()
 	for _, want := range []string{
 		`<input type="search" id="search" placeholder="Filter by name or description, or by status:, tag:, repo:, issue:, pr:" aria-label="Filter by name or description, or by status:, tag:, repo:, issue:, pr:" autocomplete="off">`,
@@ -252,7 +271,7 @@ pull_requests: [https://github.com/suzuki-shunsuke/saki/pull/105, https://github
 
 func TestHandlerColumnOrder(t *testing.T) {
 	t.Parallel()
-	h := serve.NewHandler(slog.New(slog.DiscardHandler), emptyTasksDir(t), nil, nil, nil, nil)
+	h := serve.NewHandler(slog.New(slog.DiscardHandler), "", emptyTasksDir(t), nil, nil, nil, nil)
 	rec := getIndex(h)
 
 	matches := regexp.MustCompile(`<th data-col="([a-z_]+)">`).FindAllStringSubmatch(rec.Body.String(), -1)
@@ -271,7 +290,7 @@ func TestHandlerColumnOrder(t *testing.T) {
 
 func TestHandlerStatus(t *testing.T) {
 	t.Parallel()
-	h := serve.NewHandler(slog.New(slog.DiscardHandler), emptyTasksDir(t), nil, nil, nil, nil)
+	h := serve.NewHandler(slog.New(slog.DiscardHandler), "", emptyTasksDir(t), nil, nil, nil, nil)
 	tests := []struct {
 		name   string
 		target string
