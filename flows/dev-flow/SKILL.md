@@ -26,6 +26,7 @@ If a human judges it necessary and explicitly invokes the skill, start the flow 
 1. If there is none, generate the task documents from the templates before writing any code, write Background / What / Why / Scope / Out of Scope, and ask the human for a review (start from step 1 of Steps). If the request is too vague to write these, ask what they want implemented
     - If what to do (What) is not yet decided and investigation or organizing information is needed to decide it, start an investigation task (see "Investigation Tasks")
 1. If there is one, determine the progress from task.yaml's `type` and `status`, the Next Action at the top of `<task id>.md`, which sections are filled in, and the decision log in details.md, and resume from the next step. Name the herdr tab after the task (see "Naming the herdr Tab")
+    - If the work needs the task's worktree and it no longer exists (it was removed by "Cleaning Up a Finished Task", for example when a cancelled task is resumed), create it again from the task's branch and record its path in details.md (see "Recording the Worktree")
 
 Work on each task in its own herdr pane.
 
@@ -220,6 +221,7 @@ pull_requests:
     - If `saki assignee` fails, leave `assignees` empty (`[]`), tell the human in a sentence with its error, and continue. Don't retry
     - Don't change `assignees` after creating the task, even when you resume a task created by someone else, and don't add it to a task.yaml that has none. The human edits it to add or change the people in charge
 - Update `status` as the steps progress (on entering each step, set the corresponding value above, and set `done` when the pull request is merged). While waiting for human approval, do not set `pending`; keep the value of that step. Update the Next Action at the top of `<task id>.md` at the same time (see "The Head of the Task Document")
+- Once a task is `done` or `cancel` and nothing is left for the human, clean it up (see "Cleaning Up a Finished Task")
 - When you create a pull request or issue, add it to `pull_requests` / `issues`
 - When you create a sub task, set both the parent's `sub_tasks` and the child's `parent_task`
 - When you create a task from an investigation task, set both the investigation task's `derived_tasks` and the new task's `derived_from`. Distinguish these from sub tasks (one task split per pull request)
@@ -287,7 +289,7 @@ Unverified claims make the reviewer verify and correct them, which adds review r
 1. Have an agent review the pull request, and repeat until it converges
 1. Write the PR Explanation (see "PR Explanation Format"). It is a document for humans, so write it against the code as it stands after review has finished changing it
 
-Create a dedicated git worktree for implementation. Delete the worktree once the pull request is merged.
+Create a dedicated git worktree for implementation, and record its path in details.md (see "Recording the Worktree"). Don't delete it when the pull request is merged: it is removed when the task is cleaned up (see "Cleaning Up a Finished Task").
 
 At this stage, follow these rules.
 
@@ -304,6 +306,7 @@ At this stage, follow these rules.
     - A task created from Follow-ups is a draft: generate it from the templates with `status: backlog`, write what is known in Background / What / Why, and note in Background which task's Follow-ups it came from. Its overview is approved from step 1 of Steps when it is started
     - In the original task's Follow-ups, write the task id next to each item
 1. The human merges
+1. Once the task is `done` and nothing is left for the human, clean it up (see "Cleaning Up a Finished Task")
 
 ## Investigation Tasks
 
@@ -348,6 +351,57 @@ If the approved Questions / Scope cannot produce an answer, or the investigation
     - Set both `derived_from` / `derived_tasks` in task.yaml
     - New tasks start from step 1 of Steps. Write the overview based on the investigation's conclusion and get the human's approval
 1. Set the investigation task's `status` to `done`
+1. Once nothing is left for the human, clean the investigation task up (see "Cleaning Up a Finished Task")
+
+## Cleaning Up a Finished Task
+
+When a task is finished, remove its worktrees and close the herdr pane the session runs in, so that finished tasks don't pile up as panes and tabs in herdr and as worktrees on disk.
+This applies to implementation tasks and investigation tasks alike.
+
+### When to Clean Up
+
+At the end of a turn responding to a human message, clean up only when all of the following hold. Otherwise don't, and wait for the human's next message as usual.
+
+1. The task's `status` is `done` or `cancel`
+1. Nothing is left for the human to decide or answer: the Next Action is "None (done)" or "None (cancelled)", and deciding which Follow-ups become tasks and creating them are finished
+1. This turn's reply has nothing the human needs to read, such as an answer to a question, material for a decision, or a report of a failure. If it has, don't clean up in this turn (don't remove the worktrees either): reply, end the reply with a sentence saying that sending any message will clean the task up, and wait. Clean up in a later turn whose reply has nothing to read (a short reply such as "ok" from the human is enough)
+    - Things already recorded in the documents, such as a report that the task was set to `done` or `cancel` or the ids of tasks created from Follow-ups, don't count as something to read
+1. This session won't go on to work on another task afterwards (for example writing the overview of a task derived from an investigation task)
+
+This is not limited to the session that set `done` or `cancel`. A session that reopens a finished task to reread documents or ask questions follows the same conditions: it doesn't clean up in a turn that answers a question, and cleans up in a turn with nothing to read.
+
+However, don't clean up in the turn responding to the prompt that starts the session (the prompt sent by `saki serve`'s new or open button or its new task form, or the human's first request), because the human may have opened the task to reread it or ask questions. Clean up only in a turn after the human has sent another message in the session.
+When a session that cleaned up is resumed (for example by `saki serve`'s open button, which sends no prompt), treat the human's first message after the resume the same as a prompt that starts the session, and don't clean up in the turn responding to it. You can tell such a session because its last turn ended by closing the pane, or because details.md records that the task was cleaned up and the pane closed.
+
+### What to Do
+
+Do the following in this order.
+
+1. Remove every worktree whose path is recorded in details.md (see "Recording the Worktree"). Pass the worktree to `-C`, because tasks/ and the worktree are usually in different repositories and the command must work whatever the current directory is. Don't pass `--force`
+
+    ```sh
+    test -d <path> && git -C <path> worktree remove <path>
+    ```
+
+    - If the directory no longer exists (`test -d <path>` is false), skip that path. It doesn't count as a failure
+    - Don't remove worktrees that aren't recorded in details.md, such as those of tasks started before this rule: the agent didn't necessarily create them, and they may be the human's. Say nothing about them
+    - A task that created no worktree (such as a usual investigation task) skips this step
+    - If any worktree can't be removed (git refuses because of uncommitted changes or untracked files, for example), don't go on to step 3 (don't close the pane). Record in details.md the worktrees removed so far, tell the human which worktree couldn't be removed and why, and wait. Don't pass `--force` or discard the changes on your own judgment. After handling the human's instruction, follow "When to Clean Up" again
+    - Don't delete branches. Unpushed commits of a cancelled task stay on its branch
+1. Record the cleanup in details.md: the date, the paths of the removed worktrees, and, if step 3 will close the pane, that the pane is closed. The human can't read your last message once the pane is closed, so the record is kept in the document
+1. Last, close your herdr pane. If the tab has no other pane, herdr closes the tab too; otherwise the tab stays. Closing the pane stops you, so put nothing after it
+
+    ```sh
+    herdr pane close "$HERDR_PANE_ID"
+    ```
+
+    - Only an agent whose prompt contains "This pane is dedicated to this task. Don't open another pane." closes its pane. An agent without that sentence, or without the environment variable `HERDR_PANE_ID` (running outside herdr), doesn't close any pane, and says nothing about it
+    - If `herdr` isn't found or returns an error and the pane isn't closed, you are still running: add to details.md that the pane wasn't closed, so that the record matches what happened, and tell the human in a sentence. Don't retry
+
+### Recording the Worktree
+
+- When you create a worktree for the task (step 3 of Steps, or when recreating one on resuming a task), record its absolute path in details.md, so that `git -C <path>` points at the same worktree whatever the current directory is
+- If a task creates more than one worktree (in several repositories, or recreated on resuming), record each of them
 
 ## Review Rules
 

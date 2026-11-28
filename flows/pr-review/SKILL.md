@@ -24,6 +24,7 @@ Pull requests created and managed with dev-flow are out of scope: a pull request
     - `doing` otherwise (the review stopped in steps 1-4): determine the progress from which sections are filled in and the record in details.md, and continue from the next step. If review.md has no Reviewed Head yet, continue step 1. If it has one and the pull request's head is newer, first move to the new head: record the change in details.md, update the documents already written according to the diff (`git diff <reviewed head>..<new head>`), point the worktree and the code links at the new head, and update Reviewed Head. Then continue from the step where the review stopped. Don't use "When the Pull Request Is Updated", which is for reviews that finished step 4 and returns to step 5
     - `in-review` or `done`: compare the Reviewed Head recorded in the documents with the pull request's current head. If the pull request has been updated, follow "When the Pull Request Is Updated"; otherwise resume from step 5 of Steps
     - `pending` or `cancel`: ask the human whether to resume the review
+    - In any case, if the work needs the worktree and it no longer exists (it was removed by "Cleaning Up a Finished Review"), check out the Reviewed Head (the new head when following "When the Pull Request Is Updated") with git worktree again, and record its path in details.md (see "Recording the Worktree")
 
 Work on each review in its own herdr pane.
 
@@ -90,6 +91,8 @@ Update `status` as the review progresses.
 
 Use `pending` and `cancel` only when the human says so.
 
+Once a review is `done` or `cancel` and nothing is left for the human, clean it up (see "Cleaning Up a Finished Review").
+
 ## Steps
 
 ### 1. Collect Information
@@ -101,7 +104,7 @@ Use `pending` and `cancel` only when the human says so.
     - Existing review comments and conversations (`gh pr view --comments`, `gh api repos/<owner>/<repo>/pulls/<number>/comments`)
     - CI results (`gh pr checks`)
 1. Collect the intent and history of the change from the pull request's description, linked issues, and related pull requests
-1. The diff alone does not show callers or surrounding context, so check out the pull request's head with git worktree and read the code
+1. The diff alone does not show callers or surrounding context, so check out the pull request's head with git worktree and read the code. Record the worktree's path in details.md (see "Recording the Worktree")
 1. Base everything written from here on on the head SHA at this point. Record it as Reviewed Head in review.md
 
 Record the collected information and its sources in details.md.
@@ -179,15 +182,63 @@ Write improvement ideas outside the pull request's purpose in Follow-ups, not in
 1. Post them only after getting the human's approval. Approve or Request changes only when the human explicitly instructs it
 1. Record the URLs of the posted comments in details.md and update the status of the Review Findings
 1. When the human says the review is finished, set `status` to `done`
+1. Once nothing is left for the human, clean the review up (see "Cleaning Up a Finished Review")
 
 ## When the Pull Request Is Updated
 
 1. Set `status` to `doing`, and record in details.md that the update from the Reviewed Head to the new head started, so that a session resuming the review knows it stopped during the update (see "Starting the Flow")
-1. Check the diff from the Reviewed Head to the new head (`git diff <reviewed head>..<new head>` or GitHub's compare)
+1. Check the diff from the Reviewed Head to the new head (`git diff <reviewed head>..<new head>` or GitHub's compare). If reading the code needs the worktree and it no longer exists, check out the new head with git worktree again and record its path in details.md (see "Recording the Worktree")
 1. Update review.md and pr-explanation.md according to the diff. Repoint code links to the new head's SHA
 1. Have an agent review the added diff under the same rules as step 4 of Steps. Also check whether existing Review Findings have been resolved, and update their status
 1. Update Reviewed Head to the new head, and record what changed and that the update finished in details.md
 1. Resume from step 5 of Steps
+
+## Cleaning Up a Finished Review
+
+When a review is finished, remove its worktrees and close the herdr pane the session runs in, so that finished reviews don't pile up as panes and tabs in herdr and as worktrees on disk.
+
+### When to Clean Up
+
+At the end of a turn responding to a human message, clean up only when all of the following hold. Otherwise don't, and wait for the human's next message as usual.
+
+1. The review's `status` is `done` or `cancel`
+1. Nothing is left for the human to decide or answer: no question to the human is pending
+1. This turn's reply has nothing the human needs to read, such as an answer to a question, material for a decision, or a report of a failure. If it has, don't clean up in this turn (don't remove the worktrees either): reply, end the reply with a sentence saying that sending any message will clean the review up, and wait. Clean up in a later turn whose reply has nothing to read (a short reply such as "ok" from the human is enough)
+    - Things already recorded in the documents, such as a report that the review was set to `done` or `cancel` or the URLs of posted comments, don't count as something to read
+1. This session won't go on to work on another task afterwards
+
+This is not limited to the session that set `done` or `cancel`. A session that reopens a finished review to reread documents or ask questions follows the same conditions: it doesn't clean up in a turn that answers a question, and cleans up in a turn with nothing to read.
+
+However, don't clean up in the turn responding to the prompt that starts the session (the prompt sent by `saki serve`, or the human's first request), because the human may have opened the review to reread it or ask questions. Clean up only in a turn after the human has sent another message in the session.
+When a session that cleaned up is resumed (for example by `saki serve`'s open button, which sends no prompt), treat the human's first message after the resume the same as a prompt that starts the session, and don't clean up in the turn responding to it. You can tell such a session because its last turn ended by closing the pane, or because details.md records that the review was cleaned up and the pane closed.
+
+### What to Do
+
+Do the following in this order.
+
+1. Remove every worktree whose path is recorded in details.md (see "Recording the Worktree"). Pass the worktree to `-C`, because tasks/ and the worktree are usually in different repositories and the command must work whatever the current directory is. Don't pass `--force`
+
+    ```sh
+    test -d <path> && git -C <path> worktree remove <path>
+    ```
+
+    - If the directory no longer exists (`test -d <path>` is false), skip that path. It doesn't count as a failure
+    - Don't remove worktrees that aren't recorded in details.md, such as those of reviews started before this rule: the agent didn't necessarily create them, and they may be the human's. Say nothing about them
+    - If any worktree can't be removed (git refuses because of uncommitted changes or untracked files, for example), don't go on to step 3 (don't close the pane). Record in details.md the worktrees removed so far, tell the human which worktree couldn't be removed and why, and wait. Don't pass `--force` or discard the changes on your own judgment. After handling the human's instruction, follow "When to Clean Up" again
+1. Record the cleanup in details.md: the date, the paths of the removed worktrees, and, if step 3 will close the pane, that the pane is closed. The human can't read your last message once the pane is closed, so the record is kept in the document
+1. Last, close your herdr pane. If the tab has no other pane, herdr closes the tab too; otherwise the tab stays. Closing the pane stops you, so put nothing after it
+
+    ```sh
+    herdr pane close "$HERDR_PANE_ID"
+    ```
+
+    - Only an agent whose prompt contains "This pane is dedicated to this task. Don't open another pane." closes its pane. An agent without that sentence, or without the environment variable `HERDR_PANE_ID` (running outside herdr), doesn't close any pane, and says nothing about it
+    - If `herdr` isn't found or returns an error and the pane isn't closed, you are still running: add to details.md that the pane wasn't closed, so that the record matches what happened, and tell the human in a sentence. Don't retry
+
+### Recording the Worktree
+
+- When you create a worktree for the review (step 1 of Steps, or when recreating one on resuming the review), record its absolute path in details.md, so that `git -C <path>` points at the same worktree whatever the current directory is
+- If a review creates more than one worktree (recreated on resuming, for example), record each of them
 
 ## PR Explanation
 
