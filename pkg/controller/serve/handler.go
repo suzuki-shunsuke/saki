@@ -170,9 +170,10 @@ func claudeSessions(t *task.Task) []item {
 }
 
 // NewHandler returns the handler serving the list of the tasks.
-// version is the version of saki, shown in the page header. It reads the tasks of tasksDir on every request, so changes to task.yaml show up on
-// reload. initialFailures are the failures of the read at startup, which NewHandler warns
-// about so that the first request doesn't repeat the warnings. When a task's open
+// It reads the tasks of tasksDir on every request, so changes to task.yaml show up on
+// reload. version is the version of saki, shown in the page header. initialFailures
+// are the failures of the read at startup, which NewHandler warns about so that the
+// first request doesn't repeat the warnings. When a task's open
 // button is clicked, h focuses the herdr pane of the task's session, l resumes the session in
 // a new tab when no pane is found, and l starts a new session when the task has none. m opens
 // a task's documents in mo when its mo button is clicked, and l starts Claude Code in a new
